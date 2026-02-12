@@ -107,7 +107,7 @@ app.post('/dashboard', (req, res) => {
                     <div class="container">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
                             <h2 style="color: #333;">Resumen de tu Red</h2>
-                            <button class="btn-new" onclick="abrirModal()">+ NUEVO SOCIO</button>
+                            <button type="button" class="btn-new" style="cursor:pointer;" onclick="document.getElementById('modalSocio').style.display='block'">+ NUEVO SOCIO</button>
                         </div>
                         
                         <div class="stats">
