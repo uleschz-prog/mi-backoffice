@@ -1,11 +1,11 @@
 /**
  * ============================================================================
- * SISTEMA RAÍZOMA PRO V22.0 - CORE BUSINESS ENGINE
+ * SISTEMA RAÍZOMA PRO - RECONSTRUCCIÓN CORE
  * ----------------------------------------------------------------------------
- * - ÁRBOL GENEALÓGICO: Visualización de 3 niveles de profundidad.
- * - REGLA 60/40: Lógica de volumen para calificación de rangos.
- * - CICLO 30 DÍAS: Reinicio automático de puntos por socio.
- * - FX LIVE: Conversión MXN a USDT en tiempo real.
+ * - DASHBOARD: Cuenta Madre con vinculación de retiros.
+ * - CICLO: 30 días exactos para calificar metas.
+ * - RED: Visualización de inversión y estado de socios.
+ * - PAGOS: Conversión automática MXN a USDT.
  * ============================================================================
  */
 
@@ -18,203 +18,179 @@ const app = express();
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// --- DATABASE (PERSISTENCIA RENDER) ---
+// --- DATABASE ---
 const dbPath = process.env.NODE_ENV === 'production' 
     ? '/var/lib/data/negocio.db' 
     : path.join(__dirname, 'negocio.db');
 const db = new sqlite3.Database(dbPath);
 
-// --- MOTOR DE TIPO DE CAMBIO ---
+// --- TIPO DE CAMBIO EN VIVO ---
 let tcMXN = 18.50;
 function updateFX() {
     https.get('https://api.exchangerate-api.com/v4/latest/USD', (res) => {
         let data = '';
         res.on('data', d => data += d);
-        res.on('end', () => { tcMXN = JSON.parse(data).rates.MXN; });
+        res.on('end', () => { 
+            try { tcMXN = JSON.parse(data).rates.MXN; } catch(e){}
+        });
     });
 }
 setInterval(updateFX, 3600000); updateFX();
 
-// --- ESTRUCTURA DE TABLAS ---
+// --- TABLAS ---
 db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS socios (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        patrocinador_id TEXT, 
         propio_id TEXT UNIQUE,
         nombre TEXT,
-        membresia TEXT,
-        puntos_mxn INTEGER,
-        fecha_reg DATETIME DEFAULT CURRENT_TIMESTAMP
+        inversion INTEGER,
+        fecha_reg DATETIME DEFAULT CURRENT_TIMESTAMP,
+        banco TEXT, clabe TEXT, wallet TEXT, red_wallet TEXT
     )`);
 
     db.run(`CREATE TABLE IF NOT EXISTS pendientes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        patrocinador_id TEXT,
-        nombre TEXT,
-        paquete_mxn INTEGER,
-        monto_usd REAL,
-        hash TEXT
+        nombre TEXT, paquete_mxn INTEGER, monto_usd REAL, hash TEXT
     )`);
 });
 
-// --- LÓGICA DE CALIFICACIÓN (EL CORAZÓN DEL NEGOCIO) ---
-function procesarRed(socios) {
-    const hoy = new Date();
-    
-    return socios.map(socio => {
-        // 1. Calcular Ciclo de 30 días
-        const dias = Math.floor((hoy - new Date(socio.fecha_reg)) / (1000*60*60*24));
-        socio.diasRestantes = Math.max(0, 30 - dias);
-        
-        // Si el ciclo venció, sus puntos personales para la red son 0
-        const puntosEfectivos = socio.diasRestantes > 0 ? socio.puntos_mxn : 0;
-
-        // 2. Construir Niveles (3 profundidades)
-        const nivel1 = socios.filter(s => s.patrocinador_id === socio.propio_id);
-        const nivel2 = socios.filter(s => nivel1.some(n1 => s.patrocinador_id === n1.propio_id));
-        const nivel3 = socios.filter(s => nivel2.some(n2 => s.patrocinador_id === n2.propio_id));
-
-        // 3. Calcular Volumen Total
-        const volN1 = nivel1.reduce((sum, s) => sum + s.puntos_mxn, 0);
-        const volN2 = nivel2.reduce((sum, s) => sum + s.puntos_mxn, 0);
-        const volN3 = nivel3.reduce((sum, s) => sum + s.puntos_mxn, 0);
-        
-        socio.volumenRed = volN1 + volN2 + volN3;
-        socio.hijosDirectos = nivel1.length;
-
-        // 4. Regla 60/40 (Simplificada para visualización)
-        // Buscamos la pierna más fuerte
-        const volPorPierna = nivel1.map(directo => {
-            const descendencia = socios.filter(s => s.patrocinador_id === directo.propio_id); // Nivel 2 de la pierna
-            return directo.puntos_mxn + descendencia.reduce((a,b) => a + b.puntos_mxn, 0);
-        });
-        
-        const maxPierna = Math.max(0, ...volPorPierna);
-        socio.piernaFuertePct = socio.volumenRed > 0 ? ((maxPierna / socio.volumenRed) * 100).toFixed(1) : 0;
-        socio.cumple6040 = socio.piernaFuertePct <= 60;
-
-        return socio;
-    });
-}
-
-// --- ESTILOS ---
+// --- ESTILOS (Inspirados en tus capturas) ---
 const CSS = `
 <style>
-    :root { --p:#1e3a8a; --a:#10b981; --d:#ef4444; --w:#f59e0b; }
-    body { font-family: sans-serif; background: #f1f5f9; margin:0; }
-    .nav { background: var(--p); color:white; padding:1rem 2rem; display:flex; justify-content:space-between; align-items:center; }
-    .card { background:white; padding:1.5rem; border-radius:1rem; box-shadow:0 4px 6px -1px #00000010; margin-bottom:1rem; }
-    table { width:100%; border-collapse:collapse; background:white; border-radius:1rem; overflow:hidden; }
-    th { background:#f8fafc; padding:1rem; text-align:left; font-size:0.7rem; color:#64748b; }
-    td { padding:1rem; border-bottom:1px solid #f1f5f9; }
-    .badge { padding:0.3rem 0.6rem; border-radius:0.5rem; font-size:0.7rem; font-weight:bold; }
-    .b-ok { background:#ecfdf5; color:#065f46; }
-    .b-alert { background:#fee2e2; color:#b91c1c; }
+    :root { --blue-dark: #1a237e; --blue-light: #3f51b5; --green: #2ecc71; --bg: #f5f7fa; }
+    body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #333; }
+    .container { max-width: 1000px; margin: auto; background: white; border-radius: 20px; padding: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+    .stats-row { display: grid; grid-template-columns: 1fr 1fr 1.5fr; gap: 20px; margin-bottom: 30px; }
+    .stat-card { background: white; padding: 20px; border-radius: 15px; border: 1px solid #eee; }
+    .stat-card.dark { background: #1e293b; color: white; }
+    .input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0; }
+    input, select { padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; width: 100%; box-sizing: border-box; }
+    .btn { padding: 12px 25px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; transition: 0.3s; }
+    .btn-green { background: var(--green); color: white; width: 100%; }
+    .btn-blue { background: var(--blue-light); color: white; }
+    .cycle-bar { height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden; margin-top: 10px; }
+    .cycle-progress { height: 100%; background: var(--blue-light); width: 75%; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th { text-align: left; color: #94a3b8; font-size: 12px; text-transform: uppercase; padding: 10px; }
+    td { padding: 15px 10px; border-top: 1px solid #f1f5f9; }
 </style>`;
 
-// --- RUTAS ---
+// --- VISTAS ---
+
+app.get('/dashboard', (req, res) => {
+    db.all("SELECT * FROM socios", (err, socios) => {
+        const volumenTotal = socios.reduce((a, b) => a + b.inversion, 0);
+        
+        res.send(`
+<html><head>${CSS}</head><body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1 style="margin:0; color:var(--blue-dark);">Cuenta Madre</h1>
+                <span style="background:#e0e7ff; color:var(--blue-light); padding:4px 12px; border-radius:10px; font-size:12px; font-weight:bold;">ASOCIADO PARTNER</span>
+            </div>
+            <div style="text-align:right;">
+                <b style="color:var(--blue-dark); text-transform:uppercase;">Cierre de Ciclo</b>
+                <div class="cycle-bar"><div class="cycle-progress"></div></div>
+                <small style="color:#94a3b8;">Faltan 30 días</small>
+            </div>
+        </div>
+
+        <div class="stats-row">
+            <div class="stat-card dark">
+                <small>VOLUMEN DE RED</small>
+                <div style="font-size:24px; font-weight:bold; margin:5px 0;">$${volumenTotal.toLocaleString()}</div>
+                <small style="opacity:0.7;">Meta: $15,000</small>
+            </div>
+            <div class="stat-card">
+                <small>MI BILLETERA</small>
+                <div style="font-size:24px; font-weight:bold; margin:5px 0; color:var(--blue-light);">$0.00</div>
+            </div>
+            <div class="stat-card" style="display:flex; align-items:center; gap:10px;">
+                <input type="number" placeholder="Monto $">
+                <button class="btn btn-blue">RETIRAR</button>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <b style="color:#64748b; font-size:14px;">🔗 Vinculación de Cuentas (Retiros)</b>
+            <div class="input-grid">
+                <input type="text" placeholder="Nombre del Banco">
+                <input type="text" placeholder="CLABE Interbancaria (18 dígitos)">
+                <input type="text" placeholder="Dirección Wallet USDT">
+                <select>
+                    <option>RED TRON (TRC20)</option>
+                    <option>RED BINANCE (BEP20)</option>
+                </select>
+            </div>
+            <button class="btn btn-green">ACTUALIZAR DATOS DE PAGO</button>
+        </div>
+
+        <div style="margin-top:40px; display:flex; justify-content:space-between; align-items:center;">
+            <h3>Socios en Red</h3>
+            <a href="/unete" class="btn btn-blue" style="text-decoration:none;">+ Nuevo Socio</a>
+        </div>
+
+        <table>
+            <thead>
+                <tr><th>Socio</th><th>Inversión</th><th>Estado</th><th>Acción</th></tr>
+            </thead>
+            <tbody>
+                ${socios.map(s => `
+                    <tr>
+                        <td><b>${s.nombre}</b><br><small style="color:#94a3b8;">${s.propio_id}</small></td>
+                        <td>$${s.inversion.toLocaleString()}</td>
+                        <td><span style="color:var(--green)">● Activo</span></td>
+                        <td>
+                            <form action="/borrar" method="POST" style="margin:0;">
+                                <input type="hidden" name="id" value="${s.id}">
+                                <button style="color:red; border:none; background:none; cursor:pointer;">Borrar</button>
+                            </form>
+                        </td>
+                    </tr>
+                `).join('') || '<tr><td colspan="4" style="text-align:center; padding:40px; color:#94a3b8;">No hay socios registrados</td></tr>'}
+            </tbody>
+        </table>
+    </div>
+</body></html>`);
+    });
+});
 
 app.get('/unete', (req, res) => {
     const usd = (1750 / tcMXN).toFixed(2);
-    res.send(`<html><head>${CSS}</head><body style="display:flex; justify-content:center; padding:2rem;">
-        <div class="card" style="width:400px;">
-            <h2 style="color:var(--p)">Registro Raízoma</h2>
-            <p>1 USD = $${tcMXN} MXN</p>
+    res.send(`<html><head>${CSS}</head><body style="display:flex; justify-content:center; align-items:center; height:100vh;">
+        <div class="container" style="max-width:450px;">
+            <h2 style="color:var(--blue-dark); text-align:center;">Unirse a Raízoma</h2>
             <form action="/registrar" method="POST">
-                <input name="pat" placeholder="ID Patrocinador (RZ-000001)" required style="width:100%; margin-bottom:1rem; padding:0.8rem;">
-                <input name="nom" placeholder="Tu Nombre" required style="width:100%; margin-bottom:1rem; padding:0.8rem;">
-                <select name="pkg" style="width:100%; margin-bottom:1rem; padding:0.8rem;">
-                    <option value="1750">Membresía VIP ($1,750 MXN)</option>
-                    <option value="15000">Paquete Fundador ($15,000 MXN)</option>
+                <input name="nom" placeholder="Nombre Completo" required style="margin-bottom:15px;">
+                <select name="pkg" style="margin-bottom:15px;">
+                    <option value="1750">VIP ($1,750 MXN)</option>
+                    <option value="15000">Fundador ($15,000 MXN)</option>
                 </select>
-                <div style="background:#f1f5f9; padding:1rem; border-radius:0.5rem; text-align:center; margin-bottom:1rem;">
-                    Pagar: <b style="color:var(--a); font-size:1.2rem;">$${usd} USDT</b>
+                <div style="background:#f1f5f9; padding:15px; border-radius:10px; text-align:center; margin-bottom:15px;">
+                    Pagar: <b style="color:var(--green); font-size:1.2rem;">$${usd} USDT</b>
                     <input type="hidden" name="usd" value="${usd}">
                 </div>
-                <input name="hash" placeholder="Hash de Transacción" required style="width:100%; margin-bottom:1rem; padding:0.8rem;">
-                <button type="submit" style="width:100%; padding:1rem; background:var(--p); color:white; border:none; border-radius:0.5rem; cursor:pointer;">ENVIAR PAGO</button>
+                <input name="hash" placeholder="Hash de Pago" required style="margin-bottom:15px;">
+                <button type="submit" class="btn btn-blue" style="width:100%;">ENVIAR SOLICITUD</button>
             </form>
         </div>
     </body></html>`);
 });
 
-app.post('/dashboard', (req, res) => {
-    if (req.body.user === "admin@raizoma.com" && req.body.pass === "1234") {
-        db.all("SELECT * FROM socios", (err, rows) => {
-            const red = procesarRed(rows);
-            db.all("SELECT * FROM pendientes", (err, pends) => {
-                res.send(`<html><head>${CSS}</head><body>
-                    <div class="nav"><b>RAÍZOMA MADRE</b> <span>TC: $${tcMXN}</span></div>
-                    <div style="padding:2rem;">
-                        <div class="card" style="border-left:5px solid var(--w)">
-                            <h3>📥 Pagos por Validar (${pends.length})</h3>
-                            <table>
-                                <thead><tr><th>Socio</th><th>Monto USDT</th><th>Hash</th><th>Acción</th></tr></thead>
-                                <tbody>
-                                    ${pends.map(p => `<tr>
-                                        <td>${p.nombre} (Pat: ${p.patrocinador_id})</td>
-                                        <td><b>$${p.monto_usd}</b></td>
-                                        <td><code>${p.hash}</code></td>
-                                        <td><form action="/aprobar" method="POST"><input type="hidden" name="id" value="${p.id}"><button style="background:var(--a); color:white; border:none; padding:0.5rem; border-radius:0.3rem;">APROBAR</button></form></td>
-                                    </tr>`).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div class="card">
-                            <h3>👥 Árbol de Red y Volumen (3 Niveles)</h3>
-                            <table>
-                                <thead><tr><th>Socio</th><th>Directos</th><th>Vol. Red</th><th>Pierna Fuerte</th><th>Ciclo</th><th>Acción</th></tr></thead>
-                                <tbody>
-                                    ${red.map(s => `<tr>
-                                        <td><b>${s.propio_id}</b><br>${s.nombre}</td>
-                                        <td>${s.hijosDirectos}</td>
-                                        <td>$${s.volumenRed.toLocaleString()} MXN</td>
-                                        <td><span class="badge ${s.cumple6040 ? 'b-ok' : 'b-alert'}">${s.piernaFuertePct}%</span></td>
-                                        <td><span class="badge ${s.diasRestantes < 5 ? 'b-alert' : 'b-ok'}">⏳ ${s.diasRestantes} días</span></td>
-                                        <td>
-                                            <form action="/borrar" method="POST" onsubmit="return confirm('¿Eliminar socio?')">
-                                                <input type="hidden" name="id" value="${s.id}"><button style="color:var(--d); border:none; background:none; cursor:pointer;">Borrar</button>
-                                            </form>
-                                        </td>
-                                    </tr>`).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </body></html>`);
-            });
-        });
-    } else res.redirect('/login');
-});
-
-// --- ACCIONES CORE ---
-app.post('/aprobar', (req, res) => {
-    db.get("SELECT * FROM pendientes WHERE id=?", [req.body.id], (err, p) => {
-        db.get("SELECT COUNT(*) as t FROM socios", (err, row) => {
-            const nID = "RZ-" + (row.t + 1).toString().padStart(6, '0');
-            db.run("INSERT INTO socios (patrocinador_id, propio_id, nombre, membresia, puntos_mxn) VALUES (?,?,?,?,?)",
-            [p.patrocinador_id, nID, p.nombre, 'SOCIO', p.paquete_mxn], () => {
-                db.run("DELETE FROM pendientes WHERE id=?", [req.body.id], () => res.redirect(307, '/dashboard'));
-            });
-        });
+// --- LÓGICA DE REGISTRO ---
+app.post('/registrar', (req, res) => {
+    const { nom, pkg, usd, hash } = req.body;
+    db.run("INSERT INTO pendientes (nombre, paquete_mxn, monto_usd, hash) VALUES (?,?,?,?)",
+    [nom, pkg, usd, hash], () => {
+        res.send("<script>alert('Solicitud enviada. Espera activación de la Cuenta Madre.'); window.location.href='/dashboard';</script>");
     });
 });
 
-app.post('/registrar', (req, res) => {
-    db.run("INSERT INTO pendientes (patrocinador_id, nombre, paquete_mxn, monto_usd, hash) VALUES (?,?,?,?,?)",
-    [req.body.pat, req.body.nom, req.body.pkg, req.body.usd, req.body.hash], () => res.send("<h1>Pago enviado a revisión</h1>"));
-});
-
 app.post('/borrar', (req, res) => {
-    db.run("DELETE FROM socios WHERE id=?", [req.body.id], () => res.redirect(307, '/dashboard'));
+    db.run("DELETE FROM socios WHERE id=?", [req.body.id], () => res.redirect('/dashboard'));
 });
 
-app.get('/login', (req, res) => res.send(`<form action="/dashboard" method="POST" style="text-align:center; margin-top:100px;">
-    <h2>RAÍZOMA LOGIN</h2>
-    <input name="user" value="admin@raizoma.com"><br><br>
-    <input name="pass" type="password" value="1234"><br><br>
-    <button>ENTRAR</button></form>`));
-
-app.get('/', (req, res) => res.redirect('/login'));
+app.get('/', (req, res) => res.redirect('/dashboard'));
 app.listen(process.env.PORT || 10000);
