@@ -1,11 +1,6 @@
 /**
- * ============================================================================
- * SISTEMA RAÍZOMA PRO V23.0 - LOGÍSTICA Y PAGOS
- * ----------------------------------------------------------------------------
- * - WALLET CORPORATIVA: TA4wCKDm2kNzPbJWA51CLrUAGqQcPbdtUw
- * - ENVÍOS: Captura de dirección completa para logística.
- * - BONOS: Lógica de volumen 60/40 integrada para cálculo de comisiones.
- * ============================================================================
+ * SISTEMA RAÍZOMA PRO V24.0
+ * WALLET: TA4wCKDm2kNzPbJWA51CLrUAGqQcPbdtUw
  */
 
 const express = require('express');
@@ -22,7 +17,7 @@ const dbPath = process.env.NODE_ENV === 'production'
     : path.join(__dirname, 'negocio.db');
 const db = new sqlite3.Database(dbPath);
 
-// --- MOTOR DE TIPO DE CAMBIO ---
+// MOTOR DE TIPO DE CAMBIO
 let tcMXN = 18.50;
 function actualizarTC() {
     https.get('https://api.exchangerate-api.com/v4/latest/USD', (res) => {
@@ -31,9 +26,9 @@ function actualizarTC() {
         res.on('end', () => { try { tcMXN = JSON.parse(data).rates.MXN; } catch(e){} });
     });
 }
-setInterval(actualizarTC, 3600000); actualizarTC();
+actualizarTC();
 
-// --- TABLAS ---
+// ESTRUCTURA DE TABLAS (Incluye Dirección)
 db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS socios (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,7 +38,6 @@ db.serialize(() => {
         inversion INTEGER,
         fecha_reg DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
-
     db.run(`CREATE TABLE IF NOT EXISTS pendientes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nombre TEXT, 
@@ -54,67 +48,45 @@ db.serialize(() => {
     )`);
 });
 
-const CSS = `
-<style>
-    :root { --blue: #1a237e; --green: #2ecc71; --bg: #f5f7fa; }
-    body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 20px; }
-    .container { max-width: 500px; margin: auto; background: white; border-radius: 20px; padding: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
-    .wallet-box { background: #f8fafc; border: 2px dashed var(--green); padding: 15px; border-radius: 12px; margin: 20px 0; word-break: break-all; }
-    input, select, textarea { padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; width: 100%; box-sizing: border-box; margin-bottom: 15px; font-family: inherit; }
-    .btn { background: var(--blue); color: white; padding: 15px; border: none; border-radius: 8px; width: 100%; font-weight: bold; cursor: pointer; }
-    .badge { color: var(--green); font-weight: bold; font-size: 1.2rem; }
-</style>`;
-
+// VISTA DE REGISTRO CON WALLET OFICIAL
 app.get('/unete', (req, res) => {
     const usd = (1750 / tcMXN).toFixed(2);
     res.send(`
-<html><head><title>Registro Raízoma</title>${CSS}</head>
-<body>
-    <div class="container">
-        <h2 style="color:var(--blue); text-align:center;">Inscripción Oficial</h2>
-        <form action="/registrar" method="POST">
-            <label>Nombre Completo</label>
-            <input name="nom" required>
-            
-            <label>Dirección de Envío (Calle, Num, Col, CP, Ciudad)</label>
-            <textarea name="dir" rows="3" required placeholder="Ej. Av. Reforma 123, Col. Centro, CP 06000, CDMX"></textarea>
-            
-            <label>Paquete</label>
-            <select name="pkg" id="pkg" onchange="calc()">
-                <option value="1750">Membresía VIP ($1,750 MXN)</option>
-                <option value="15000">Paquete Fundador ($15,000 MXN)</option>
-            </select>
-
-            <div class="wallet-box">
-                <small style="color:#64748b; font-weight:bold;">ENVIAR USDT (RED TRC20) A:</small><br>
-                <b style="color:var(--blue); font-size:14px;">TA4wCKDm2kNzPbJWA51CLrUAGqQcPbdtUw</b>
-            </div>
-
-            <div style="text-align:center; margin-bottom:20px;">
-                Monto exacto: <span class="badge" id="val">$${usd} USD</span>
-                <input type="hidden" name="usd_val" id="usd_val" value="${usd}">
-            </div>
-
-            <input name="hash" placeholder="Hash de Transacción / Comprobante" required>
-            <button class="btn">ENVIAR SOLICITUD DE ACTIVACIÓN</button>
-        </form>
-    </div>
-    <script>
-        function calc() {
-            const p = document.getElementById('pkg').value;
-            const res = (p / ${tcMXN}).toFixed(2);
-            document.getElementById('val').innerText = '$' + res + ' USD';
-            document.getElementById('usd_val').value = res;
-        }
-    </script>
-</body></html>`);
+    <html>
+    <head>
+        <style>
+            body { font-family: sans-serif; background: #f5f7fa; padding: 20px; }
+            .card { max-width: 450px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+            .wallet { background: #e0f2f1; padding: 15px; border-radius: 10px; border: 2px dashed #00897b; word-break: break-all; margin: 15px 0; }
+            input, textarea { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+            button { width: 100%; padding: 15px; background: #1a237e; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <h2 style="color:#1a237e; text-align:center;">Inscripción Raízoma</h2>
+            <form action="/registrar" method="POST">
+                <input name="nom" placeholder="Nombre Completo" required>
+                <textarea name="dir" placeholder="Dirección Completa de Envío (Calle, CP, Ciudad, Estado)" required rows="3"></textarea>
+                
+                <p><b>Enviar pago USDT (TRC20) a:</b></p>
+                <div class="wallet">
+                    TA4wCKDm2kNzPbJWA51CLrUAGqQcPbdtUw
+                </div>
+                
+                <p>Monto: <span style="color:green; font-weight:bold;">$${usd} USD</span></p>
+                <input name="hash" placeholder="Hash de Transacción" required>
+                <button type="submit">NOTIFICAR PAGO</button>
+            </form>
+        </div>
+    </body>
+    </html>`);
 });
 
 app.post('/registrar', (req, res) => {
-    const { nom, dir, pkg, usd_val, hash } = req.body;
-    db.run("INSERT INTO pendientes (nombre, direccion, paquete_mxn, monto_usd, hash) VALUES (?,?,?,?,?)",
-    [nom, dir, pkg, usd_val, hash], () => {
-        res.send("<script>alert('Recibido. Tu cuenta será activada tras validar el pago.'); window.location.href='/unete';</script>");
+    const { nom, dir, hash } = req.body;
+    db.run("INSERT INTO pendientes (nombre, direccion, hash) VALUES (?,?,?)", [nom, dir, hash], () => {
+        res.send("<script>alert('Recibido. Activaremos tu cuenta pronto.'); window.location.href='/unete';</script>");
     });
 });
 
