@@ -1,95 +1,117 @@
 /**
- * SISTEMA RAÍZOMA PRO V25.0 - SOLUCIÓN TOTAL
- * WALLET OFICIAL: TA4wCKDm2kNzPbJWA51CLrUAGqQcPbdtUw
+ * SISTEMA RAÍZOMA PRO V26.0 - READY FOR RENDER
+ * WALLET: TA4wCKDm2kNzPbJWA51CLrUAGqQcPbdtUw
  */
 
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
-const https = require('https');
 const path = require('path');
 const app = express();
 
+// Configuración de lectura de datos
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// BASE DE DATOS
+// CONFIGURACIÓN DE BASE DE DATOS PARA RENDER
+// En Render, los archivos se borran al reiniciar a menos que uses un disco montado.
+// Esta ruta detecta si estás en la nube o en tu Mac.
 const dbPath = process.env.NODE_ENV === 'production' 
-    ? '/var/lib/data/negocio.db' 
-    : path.join(__dirname, 'negocio.db');
+    ? '/var/lib/data/raizoma.db' 
+    : path.join(__dirname, 'raizoma.db');
+
 const db = new sqlite3.Database(dbPath);
 
-// MOTOR TIPO DE CAMBIO
-let tcMXN = 18.50;
-function actualizarTC() {
-    https.get('https://api.exchangerate-api.com/v4/latest/USD', (res) => {
-        let data = '';
-        res.on('data', d => data += d);
-        res.on('end', () => { try { tcMXN = JSON.parse(data).rates.MXN; } catch(e){} });
-    });
-}
-actualizarTC();
-
-// TABLAS
 db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS socios (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        propio_id TEXT UNIQUE,
         nombre TEXT,
         direccion TEXT,
-        inversion INTEGER,
+        volumen_red INTEGER DEFAULT 0,
         fecha_reg DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
-    db.run(`CREATE TABLE IF NOT EXISTS pendientes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nombre TEXT, 
-        direccion TEXT,
-        paquete_mxn INTEGER, 
-        monto_usd REAL, 
-        hash TEXT
-    )`);
 });
 
-// --- RESPUESTA SOBRE BONOS ---
-// Los bonos de Inicio Rápido (15%) y Residual (3 niveles) 
-// se calculan sobre el volumen que verás en tu Dashboard Madre.
+[cite_start]// LÓGICA DE COMISIONES (BONO DE GESTIÓN) [cite: 10]
+[cite_start]// Asociado Partner ($15k-$29k) -> Fijo $1,500 [cite: 10]
+[cite_start]// Director Partner ($30k-$59k) -> Fijo $4,500 [cite: 10]
+[cite_start]// Senior Managing Partner ($60k+) -> 20% Real [cite: 10]
+function calcularBonoGestion(vol) {
+    if (vol >= 60000) return vol * 0.20; 
+    if (vol >= 30000) return 4500;            
+    if (vol >= 15000) return 1500;            
+    return 0;
+}
 
-// RUTA PRINCIPAL (Para evitar el error "No se puede obtener /")
+// INTERFAZ: CUENTA MADRE
 app.get('/', (req, res) => {
-    res.send(`
-        <html><body style="font-family:sans-serif; text-align:center; padding-top:50px;">
-            <h1>Sistema Raízoma Activo</h1>
-            <a href="/unete" style="padding:10px 20px; background:#1a237e; color:white; text-decoration:none; border-radius:5px;">Ir a Registro de Socios</a>
-        </body></html>
-    `);
+    db.all("SELECT * FROM socios ORDER BY id DESC", (err, rows) => {
+        res.send(`
+        <html>
+        <head>
+            <title>Raízoma - Cuenta Madre</title>
+            <style>
+                body { font-family: 'Segoe UI', sans-serif; background: #f1f5f9; color: #1e293b; margin: 0; padding: 20px; }
+                .container { max-width: 1000px; margin: auto; background: white; padding: 30px; border-radius: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+                .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f1f5f9; padding-bottom: 20px; }
+                .btn { background: #1a237e; color: white; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: bold; }
+                table { width: 100%; border-collapse: collapse; margin-top: 30px; }
+                th { text-align: left; color: #64748b; font-size: 12px; text-transform: uppercase; padding: 15px; }
+                td { padding: 15px; border-bottom: 1px solid #f1f5f9; }
+                .rango-tag { padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; background: #e0e7ff; color: #3730a3; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>Cuenta Madre</h1>
+                    <a href="/unete" class="btn">+ Nuevo Socio</a>
+                </div>
+                <table>
+                    <thead>
+                        <tr><th>Socio / Dirección</th><th>Volumen Red</th><th>Bono Gestión</th></tr>
+                    </thead>
+                    <tbody>
+                        ${rows.map(s => `
+                            <tr>
+                                <td>
+                                    <b>${s.nombre}</b><br>
+                                    <small style="color:#64748b">${s.direccion}</small>
+                                </td>
+                                <td>$${s.volumen_red.toLocaleString()}</td>
+                                <td style="color:#10b981; font-weight:bold;">$${calcularBonoGestion(s.volumen_red).toLocaleString()}</td>
+                            </tr>
+                        `).join('') || '<tr><td colspan="3" style="text-align:center">No hay registros</td></tr>'}
+                    </tbody>
+                </table>
+            </div>
+        </body>
+        </html>`);
+    });
 });
 
-// VISTA DE REGISTRO
+[cite_start]// INTERFAZ: REGISTRO (LOGÍSTICA Y WALLET) [cite: 12]
 app.get('/unete', (req, res) => {
-    const usd = (1750 / tcMXN).toFixed(2);
     res.send(`
     <html>
-    <head>
-        <style>
-            body { font-family: sans-serif; background: #f5f7fa; padding: 20px; }
-            .card { max-width: 450px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-            .wallet { background: #e0f2f1; padding: 15px; border-radius: 10px; border: 2px dashed #00897b; word-break: break-all; margin: 15px 0; font-family: monospace; }
-            input, textarea { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
-            button { width: 100%; padding: 15px; background: #1a237e; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
-        </style>
-    </head>
+    <head><style>
+        body { font-family: sans-serif; background: #1a237e; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .form-card { background: white; padding: 40px; border-radius: 20px; width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        input, textarea { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        .wallet { background: #f0fdf4; border: 1px dashed #22c55e; padding: 15px; font-size: 12px; margin: 15px 0; word-break: break-all; }
+        button { width: 100%; background: #2ecc71; color: white; border: none; padding: 15px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+    </style></head>
     <body>
-        <div class="card">
-            <h2 style="color:#1a237e; text-align:center;">Inscripción Raízoma</h2>
+        <div class="form-card">
+            <h2 style="text-align:center; color:#1a237e">Registro Raízoma</h2>
             <form action="/registrar" method="POST">
                 <input name="nom" placeholder="Nombre Completo" required>
-                <textarea name="dir" placeholder="Dirección de Envío (Calle, CP, Ciudad, Estado)" required rows="3"></textarea>
-                
-                <p><b>Paga con USDT (TRC20) a esta Wallet:</b></p>
-                <div class="wallet">TA4wCKDm2kNzPbJWA51CLrUAGqQcPbdtUw</div>
-                
-                <p>Monto: <span style="color:green; font-weight:bold;">$${usd} USD</span></p>
-                <input name="hash" placeholder="Pega aquí el Hash de Transacción" required>
-                <button type="submit">NOTIFICAR PAGO A CUENTA MADRE</button>
+                <textarea name="dir" placeholder="Dirección de Envío Completa" required rows="3"></textarea>
+                <div class="wallet">
+                    <b>Pagar USDT (TRC20) a:</b><br>
+                    TA4wCKDm2kNzPbJWA51CLrUAGqQcPbdtUw
+                </div>
+                <input name="vol" type="number" placeholder="Inversión Inicial ($)" required>
+                <button type="submit">NOTIFICAR PAGO</button>
             </form>
         </div>
     </body>
@@ -97,10 +119,14 @@ app.get('/unete', (req, res) => {
 });
 
 app.post('/registrar', (req, res) => {
-    const { nom, dir, hash } = req.body;
-    db.run("INSERT INTO pendientes (nombre, direccion, hash) VALUES (?,?,?)", [nom, dir, hash], () => {
-        res.send("<script>alert('Recibido. Tu cuenta será activada en breve.'); window.location.href='/';</script>");
+    const { nom, dir, vol } = req.body;
+    db.run("INSERT INTO socios (nombre, direccion, volumen_red) VALUES (?,?,?)", [nom, dir, vol], () => {
+        res.redirect('/');
     });
 });
 
-app.listen(process.env.PORT || 10000, '0.0.0.0');
+// PUERTO DINÁMICO PARA RENDER (Soluciona el error 502)
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`✅ Raízoma Live en puerto ${PORT}`);
+});
