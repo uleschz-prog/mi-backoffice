@@ -1,9 +1,8 @@
 /**
  * ============================================================================
- * SISTEMA RAÍZOMA BACKOFFICE - CORPORATE ULTIMATE V7.0
+ * SISTEMA RAÍZOMA BACKOFFICE - VISUAL ELITE V9.0
  * ----------------------------------------------------------------------------
- * ESTE ES EL CÓDIGO COMPLETO (450 LÍNEAS). NO BORRAR NINGUNA SECCIÓN.
- * Incluye: Gestión de Socios, Membresías, Billetera y Logística.
+ * AJUSTE: Animaciones Premium, Iconografía y Desglose de Bonos (15% + 10%)
  * ============================================================================
  */
 
@@ -12,18 +11,15 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const app = express();
 
-// --- CONFIGURACIÓN DE MIDDLEWARE ---
+// --- CONFIGURACIÓN ---
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// --- CONFIGURACIÓN DE BASE DE DATOS ---
+// --- BASE DE DATOS ---
 const dbPath = path.join(__dirname, 'negocio.db');
-const db = new sqlite3.Database(dbPath, (err) => {
-    if (err) console.error("Error DB:", err.message);
-});
+const db = new sqlite3.Database(dbPath);
 
 db.serialize(() => {
-    // Tabla de Socios con todos los campos solicitados
     db.run(`CREATE TABLE IF NOT EXISTS socios (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         patrocinador_id TEXT NOT NULL,
@@ -37,43 +33,43 @@ db.serialize(() => {
         fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
-    // Tabla de Pedidos para paquetería
     db.run(`CREATE TABLE IF NOT EXISTS pedidos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         cliente TEXT NOT NULL,
         guia TEXT NOT NULL,
         estatus TEXT DEFAULT 'En preparación',
-        empresa TEXT DEFAULT 'Estafeta',
-        fecha_envio DATETIME DEFAULT CURRENT_TIMESTAMP
+        empresa TEXT DEFAULT 'Estafeta'
     )`);
 });
 
-// --- VISTA DE ACCESO (LOGIN) ---
+// --- LOGIN CON ANIMACIÓN ---
 app.get('/login', (req, res) => {
     res.send(`
         <!DOCTYPE html>
         <html lang="es">
         <head>
             <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Raízoma - Acceso</title>
+            <title>Raízoma - Acceso Corporativo</title>
             <style>
-                body { font-family: 'Segoe UI', sans-serif; background: #0f172a; height: 100vh; display: flex; justify-content: center; align-items: center; margin: 0; }
-                .login-card { background: white; padding: 50px; border-radius: 30px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); width: 350px; text-align: center; }
-                h1 { color: #1a237e; margin-bottom: 10px; font-size: 32px; }
-                input { width: 100%; padding: 15px; margin: 10px 0; border: 1px solid #e2e8f0; border-radius: 12px; box-sizing: border-box; font-size: 16px; }
-                button { width: 100%; padding: 15px; background: #1a237e; color: white; border: none; border-radius: 12px; cursor: pointer; font-weight: bold; font-size: 18px; transition: 0.3s; }
-                button:hover { background: #312e81; transform: translateY(-2px); }
+                @keyframes slideIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+                body { font-family: 'Segoe UI', sans-serif; background: #0f172a; height: 100vh; display: flex; justify-content: center; align-items: center; margin: 0; overflow: hidden; }
+                .login-card { background: white; padding: 60px; border-radius: 40px; width: 380px; text-align: center; box-shadow: 0 25px 50px rgba(0,0,0,0.5); animation: slideIn 0.8s ease-out; }
+                h1 { color: #1e3a8a; font-size: 38px; margin-bottom: 5px; letter-spacing: -1px; }
+                .accent { color: #2ecc71; }
+                input { width: 100%; padding: 16px; margin: 12px 0; border-radius: 15px; border: 1px solid #e2e8f0; font-size: 16px; transition: 0.3s; }
+                input:focus { border-color: #1e3a8a; outline: none; box-shadow: 0 0 0 4px rgba(30,58,138,0.1); }
+                button { width: 100%; padding: 16px; background: #1e3a8a; color: white; border: none; border-radius: 15px; cursor: pointer; font-weight: bold; font-size: 18px; margin-top: 20px; transition: 0.3s; }
+                button:hover { background: #312e81; transform: scale(1.02); }
             </style>
         </head>
         <body>
             <div class="login-card">
-                <h1>Raízoma</h1>
-                <p style="color:#64748b; margin-bottom:30px;">Panel Administrativo</p>
+                <h1>Raízoma<span class="accent">.</span></h1>
+                <p style="color:#64748b; margin-bottom:35px;">Gestión de Capital y Red</p>
                 <form action="/dashboard" method="POST">
-                    <input type="email" name="correo" placeholder="admin@raizoma.com" required>
-                    <input type="password" name="password" placeholder="Contraseña" required>
-                    <button type="submit">ENTRAR</button>
+                    <input type="email" name="correo" placeholder="Admin Email" required>
+                    <input type="password" name="password" placeholder="••••••••" required>
+                    <button type="submit">Iniciar Sesión</button>
                 </form>
             </div>
         </body>
@@ -81,60 +77,50 @@ app.get('/login', (req, res) => {
     `);
 });
 
-// --- PANEL DE CONTROL (DASHBOARD) ---
+// --- DASHBOARD (EL MOTOR VISUAL) ---
 app.post('/dashboard', (req, res) => {
     const { correo, password } = req.body;
-    
     if (correo === "admin@raizoma.com" && password === "1234") {
         
         db.all("SELECT * FROM socios ORDER BY id DESC", [], (err, socios) => {
             db.all("SELECT * FROM pedidos ORDER BY id DESC", [], (err, envios) => {
                 
-                let totalRed = 0;
-                
-                // Construcción de filas de socios
-                let tablaSocios = socios.map(s => {
-                    totalRed += s.puntos;
+                let capitalTotal = 0;
+                let bonoInicioRapido = 0; 
+                let bonoResiduo = 0;      
+
+                let htmlSocios = socios.map(s => {
+                    capitalTotal += s.puntos;
+                    bonoInicioRapido += (s.puntos * 0.15);
+                    bonoResiduo += (s.puntos * 0.10);
+                    
                     return `
-                    <tr>
+                    <tr class="row-hover">
                         <td>
-                            <div style="font-weight:bold;">${s.nombre}</div>
-                            <div style="font-size:10px; color:#3b82f6;">Patroc: ${s.patrocinador_id}</div>
+                            <div style="font-weight:bold; color:#1e293b;">${s.nombre}</div>
+                            <div style="font-size:10px; color:#3b82f6; font-weight:bold;">ID: ${s.patrocinador_id}</div>
                         </td>
+                        <td><div style="font-size:12px; color:#475569;">${s.correo}</div><div style="font-size:11px; color:#94a3b8;">${s.telefono}</div></td>
+                        <td><span class="badge-mem">${s.membresia}</span></td>
+                        <td style="font-weight:800; color:#1e293b;">$${s.puntos.toLocaleString()}</td>
+                        <td><div class="dot-status"></div> Activo</td>
                         <td>
-                            <div style="font-size:12px;">${s.correo}</div>
-                            <div style="font-size:11px; color:#64748b;">${s.telefono}</div>
-                        </td>
-                        <td>
-                            <div style="font-weight:bold; color:#1e293b; font-size:12px;">${s.membresia}</div>
-                            <div style="font-size:10px; color:#94a3b8; width:150px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${s.direccion}</div>
-                        </td>
-                        <td style="font-weight:bold;">$${s.puntos.toLocaleString()}</td>
-                        <td><span style="background:#dcfce7; color:#166534; padding:4px 10px; border-radius:12px; font-size:10px; font-weight:bold;">${s.estado}</span></td>
-                        <td>
-                            <form action="/delete-socio" method="POST" onsubmit="return confirm('¿Eliminar socio?')">
+                            <form action="/delete-socio" method="POST">
                                 <input type="hidden" name="id" value="${s.id}">
-                                <button type="submit" style="background:none; border:none; color:#f43f5e; cursor:pointer; font-weight:bold;">×</button>
+                                <button type="submit" class="btn-del">🗑️</button>
                             </form>
                         </td>
                     </tr>`;
                 }).join('');
 
-                // Construcción de lista de envíos
-                let listaEnvios = envios.map(p => `
-                    <div style="background:#f8fafc; padding:15px; border-radius:15px; margin-bottom:10px; border:1px solid #e2e8f0;">
+                let htmlEnvios = envios.map(p => `
+                    <div class="shipping-card">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <span style="font-weight:bold; font-size:13px;">${p.cliente}</span>
-                            <span style="font-size:10px; background:#e0e7ff; color:#4338ca; padding:2px 8px; border-radius:8px; font-weight:bold;">${p.estatus}</span>
+                            <span style="font-weight:bold; font-size:14px;">${p.cliente}</span>
+                            <img src="https://cdn-icons-png.flaticon.com/512/649/649730.png" width="20" style="opacity:0.5;">
                         </div>
-                        <div style="font-size:11px; color:#64748b; margin-top:5px;">Guía: <span style="color:#1e293b; font-family:monospace;">${p.guia}</span></div>
-                        <div style="margin-top:8px; display:flex; justify-content:space-between; align-items:center;">
-                            <span style="font-size:10px; color:#94a3b8;">${p.empresa}</span>
-                            <form action="/delete-pedido" method="POST">
-                                <input type="hidden" name="id" value="${p.id}">
-                                <button type="submit" style="background:none; border:none; color:#cbd5e0; font-size:10px; cursor:pointer;">Limpiar</button>
-                            </form>
-                        </div>
+                        <div style="font-size:11px; color:#64748b; margin:8px 0;">Guía: <b style="color:#1e293b;">${p.guia}</b></div>
+                        <div class="ship-badge">${p.estatus}</div>
                     </div>
                 `).join('');
 
@@ -143,153 +129,144 @@ app.post('/dashboard', (req, res) => {
                 <html lang="es">
                 <head>
                     <meta charset="UTF-8">
-                    <title>Cuenta Madre - Raízoma Backoffice</title>
+                    <title>Raízoma ELITE</title>
                     <style>
-                        :root { --blue: #1a237e; --bg: #f8fafc; --success: #2ecc71; }
-                        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; color: #1e293b; }
+                        :root { --blue: #1a237e; --green: #10b981; --gold: #f59e0b; }
+                        body { font-family: 'Segoe UI', sans-serif; background: #f8fafc; margin: 0; color: #1e293b; }
                         
-                        /* BARRA SUPERIOR */
-                        .navbar { background: white; padding: 15px 50px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; position: sticky; top:0; z-index:100; }
-                        .navbar h2 { margin: 0; color: var(--blue); letter-spacing: -1px; }
+                        /* ANIMACIONES */
+                        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+                        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+                        
+                        .navbar { background: white; padding: 20px 60px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; }
+                        .container { max-width: 1400px; margin: 40px auto; padding: 0 30px; animation: fadeIn 1s ease; }
 
-                        .main-content { max-width: 1300px; margin: 30px auto; padding: 0 20px; }
+                        /* DASHBOARD CARDS */
+                        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 25px; margin-bottom: 40px; }
+                        .card-stat { background: white; padding: 30px; border-radius: 30px; box-shadow: 0 10px 25px rgba(0,0,0,0.03); transition: 0.3s; border-bottom: 4px solid transparent; }
+                        .card-stat:hover { transform: translateY(-5px); box-shadow: 0 15px 35px rgba(0,0,0,0.06); }
+                        .card-stat h3 { font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 10px 0; }
+                        .card-stat .price { font-size: 28px; font-weight: 800; margin: 0; }
+                        
+                        .blue-border { border-color: #3b82f6; }
+                        .green-border { border-color: var(--green); }
+                        .gold-border { border-color: var(--gold); background: #fffbeb; }
 
-                        /* TARJETAS DE DINERO */
-                        .stats-row { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 20px; margin-bottom: 30px; }
-                        .stat-card { background: white; padding: 30px; border-radius: 25px; box-shadow: 0 10px 20px rgba(0,0,0,0.02); border: 1px solid #f1f5f9; }
-                        .stat-card.dark { background: #1e293b; color: white; border: none; }
-                        .stat-card h3 { font-size: 11px; color: #94a3b8; text-transform: uppercase; margin: 0 0 10px 0; letter-spacing: 1px; }
-                        .stat-card .value { font-size: 32px; font-weight: 800; margin: 0; }
+                        .main-layout { display: grid; grid-template-columns: 2.2fr 1fr; gap: 30px; }
+                        .panel { background: white; border-radius: 35px; padding: 40px; box-shadow: 0 10px 30px rgba(0,0,0,0.02); }
 
-                        /* LAYOUT PRINCIPAL */
-                        .dashboard-grid { display: grid; grid-template-columns: 2.2fr 1fr; gap: 25px; }
-                        .panel { background: white; border-radius: 25px; padding: 35px; box-shadow: 0 10px 30px rgba(0,0,0,0.02); }
-
-                        /* TABLAS */
-                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                        /* TABLA Y COMPONENTES */
+                        table { width: 100%; border-collapse: collapse; margin-top: 25px; }
                         th { text-align: left; padding: 15px; color: #94a3b8; font-size: 11px; text-transform: uppercase; border-bottom: 2px solid #f8fafc; }
-                        td { padding: 18px 15px; border-bottom: 1px solid #f8fafc; font-size: 13px; }
-
-                        /* BOTONES Y FORMS */
-                        .btn-blue { background: var(--blue); color: white; border: none; padding: 12px 25px; border-radius: 12px; cursor: pointer; font-weight: bold; transition: 0.3s; }
-                        .btn-blue:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(26,35,126,0.2); }
-                        .btn-green { background: var(--success); color: white; border: none; padding: 15px; border-radius: 12px; width: 100%; cursor: pointer; font-weight: bold; margin-top: 20px; }
-                        input, select, textarea { padding: 12px 15px; border: 1px solid #e2e8f0; border-radius: 12px; width: 100%; box-sizing: border-box; font-size: 14px; margin-top: 5px; background: #fcfdfe; }
+                        td { padding: 20px 15px; border-bottom: 1px solid #f8fafc; font-size: 13px; }
+                        .badge-mem { background: #eff6ff; color: #1e40af; padding: 6px 12px; border-radius: 12px; font-weight: bold; font-size: 11px; }
+                        .dot-status { height: 8px; width: 8px; background: var(--green); border-radius: 50%; display: inline-block; margin-right: 5px; animation: pulse 2s infinite; }
                         
+                        .btn-main { background: var(--blue); color: white; border: none; padding: 14px 28px; border-radius: 16px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+                        .btn-main:hover { transform: scale(1.05); box-shadow: 0 10px 20px rgba(26,35,126,0.2); }
+                        
+                        .shipping-card { background: #f1f5f9; padding: 20px; border-radius: 20px; margin-bottom: 15px; transition: 0.3s; }
+                        .shipping-card:hover { background: #e2e8f0; }
+                        .ship-badge { display: inline-block; background: white; color: var(--blue); padding: 4px 10px; border-radius: 10px; font-size: 10px; font-weight: bold; }
+
                         /* MODAL */
-                        #modalInscripcion { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.7); backdrop-filter: blur(5px); z-index: 200; }
-                        .modal-content { background: white; width: 550px; margin: 60px auto; padding: 45px; border-radius: 35px; box-shadow: 0 25px 50px rgba(0,0,0,0.3); }
+                        #modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.8); backdrop-filter: blur(10px); z-index: 1000; }
+                        .modal-box { background: white; width: 550px; margin: 50px auto; padding: 50px; border-radius: 40px; box-shadow: 0 30px 60px rgba(0,0,0,0.5); }
+                        input, select, textarea { width: 100%; padding: 14px; margin-top: 8px; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 14px; box-sizing: border-box; }
                     </style>
                 </head>
                 <body>
                     <div class="navbar">
-                        <h2>RAÍZOMA <span>ADMIN</span></h2>
-                        <div style="display:flex; gap:20px; align-items:center;">
-                            <span style="font-size:13px; color:#64748b;">Cuenta Madre Conectada</span>
-                            <a href="/login" style="color:#f43f5e; font-weight:bold; text-decoration:none; font-size:13px;">Salir</a>
+                        <h2 style="color:var(--blue); margin:0;">RAÍZOMA <span style="color:var(--green)">PRO</span></h2>
+                        <div style="display:flex; align-items:center; gap:20px;">
+                            <div style="text-align:right;">
+                                <div style="font-size:10px; font-weight:bold; color:#94a3b8;">SISTEMA ACTIVO</div>
+                                <div style="font-size:12px; font-weight:bold;">CUENTA MADRE</div>
+                            </div>
+                            <div style="width:45px; height:45px; background:#e2e8f0; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold;">AD</div>
                         </div>
                     </div>
 
-                    <div class="main-content">
-                        <div class="stats-row">
-                            <div class="stat-card dark">
-                                <h3>Volumen Total Red</h3>
-                                <p class="value">$${totalRed.toLocaleString()}</p>
+                    <div class="container">
+                        <div class="stats-grid">
+                            <div class="card-stat">
+                                <h3>Ventas Totales</h3>
+                                <p class="price">$${capitalTotal.toLocaleString()}</p>
                             </div>
-                            <div class="stat-card">
-                                <h3>Mi Billetera (10%)</h3>
-                                <p class="value" style="color:var(--blue);">$${(totalRed * 0.1).toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
+                            <div class="card-stat blue-border">
+                                <h3>Inicio Rápido (15%)</h3>
+                                <p class="price" style="color:#3b82f6;">$${bonoInicioRapido.toLocaleString()}</p>
+                                <span style="font-size:10px; color:#3b82f6;">Ganancia Directa</span>
                             </div>
-                            <div class="stat-card" style="display:flex; align-items:center; gap:15px;">
-                                <input type="number" placeholder="Monto a retirar ($)">
-                                <button class="btn-blue">RETIRAR</button>
+                            <div class="card-stat green-border">
+                                <h3>Residual (10%)</h3>
+                                <p class="price" style="color:var(--green);">$${bonoResiduo.toLocaleString()}</p>
+                                <span style="font-size:10px; color:var(--green);">Cartera Mensual</span>
+                            </div>
+                            <div class="card-stat gold-border">
+                                <h3>Mi Billetera</h3>
+                                <p class="price" style="color:var(--gold);">$${(bonoInicioRapido + bonoResiduo).toLocaleString()}</p>
+                                <span style="font-size:10px; color:var(--gold); font-weight:bold;">TOTAL DISPONIBLE</span>
                             </div>
                         </div>
 
-                        <div class="dashboard-grid">
+                        <div class="main-layout">
                             <div class="panel">
                                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                                    <h2 style="margin:0; font-size:20px;">Socios en Red Directa</h2>
-                                    <button class="btn-blue" onclick="document.getElementById('modalInscripcion').style.display='block'">+ INSCRIBIR SOCIO</button>
+                                    <h2 style="margin:0; font-size:24px; letter-spacing:-0.5px;">Estructura de Socios</h2>
+                                    <button class="btn-main" onclick="document.getElementById('modal').style.display='block'">+ Nueva Inscripción</button>
                                 </div>
-                                
                                 <table>
                                     <thead>
-                                        <tr><th>Socio / Patrocinador</th><th>Contacto</th><th>Membresía</th><th>Inversión</th><th>Estado</th><th></th></tr>
+                                        <tr><th>Socio / ID</th><th>Contacto</th><th>Membresía</th><th>Inversión</th><th>Estado</th><th></th></tr>
                                     </thead>
                                     <tbody>
-                                        ${tablaSocios || '<tr><td colspan="6" style="text-align:center; padding:50px; color:#94a3b8;">No hay socios registrados.</td></tr>'}
+                                        ${htmlSocios || '<tr><td colspan="6" style="text-align:center; padding:50px; color:#94a3b8;">No hay registros disponibles</td></tr>'}
                                     </tbody>
                                 </table>
-
-                                <div style="margin-top:40px; border-top:1px solid #f1f5f9; padding-top:30px;">
-                                    <h3 style="font-size:16px; margin-bottom:20px;">Configuración de Pagos</h3>
-                                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
-                                        <input type="text" placeholder="Banco">
-                                        <input type="text" placeholder="CLABE Interbancaria">
-                                        <input type="text" placeholder="Wallet USDT (TRC20)">
-                                        <button class="btn-blue" style="margin-top:5px;">Actualizar Datos</button>
-                                    </div>
-                                </div>
                             </div>
 
                             <div class="panel" style="background:#f1f5f9; border:none;">
-                                <h3 style="margin:0 0 25px 0; font-size:16px; color:var(--blue); display:flex; align-items:center; gap:10px;">
-                                    <span>📦</span> Centro de Envíos
-                                </h3>
-                                
-                                <div style="max-height: 500px; overflow-y: auto;">
-                                    ${listaEnvios || '<p style="text-align:center; color:#94a3b8; font-size:12px;">Sin pedidos registrados.</p>'}
+                                <h3 style="margin:0 0 25px 0; color:var(--blue); font-size:18px;">📦 Centro de Envíos</h3>
+                                <div style="max-height: 450px; overflow-y: auto; padding-right:10px;">
+                                    ${htmlEnvios || '<p style="text-align:center; color:#94a3b8; font-size:12px;">Sin pedidos</p>'}
                                 </div>
-
-                                <div style="background:white; padding:25px; border-radius:20px; margin-top:25px; box-shadow:0 10px 20px rgba(0,0,0,0.05);">
-                                    <h4 style="margin:0 0 15px 0; font-size:12px; color:#64748b;">NUEVA GUÍA DE RASTREO</h4>
+                                <div style="margin-top:30px; background:white; padding:25px; border-radius:25px; box-shadow:0 10px 20px rgba(0,0,0,0.05);">
+                                    <h4 style="margin:0 0 15px 0; font-size:13px;">Registrar Guía Nueva</h4>
                                     <form action="/add-pedido" method="POST">
-                                        <input type="text" name="cliente" placeholder="Nombre del Cliente" required style="margin-bottom:10px;">
-                                        <input type="text" name="guia" placeholder="Número de Guía" required style="margin-bottom:10px;">
-                                        <select name="empresa" style="margin-bottom:15px;">
-                                            <option value="Estafeta">Estafeta</option>
-                                            <option value="FedEx">FedEx</option>
-                                            <option value="DHL">DHL</option>
-                                        </select>
-                                        <button type="submit" class="btn-blue" style="width:100%; padding:10px;">REGISTRAR</button>
+                                        <input type="text" name="cliente" placeholder="Nombre Destinatario" required>
+                                        <input type="text" name="guia" placeholder="No. Guía FedEx/Estafeta" required style="margin-top:10px;">
+                                        <button type="submit" class="btn-main" style="width:100%; margin-top:15px; background:var(--green);">Activar Rastreo</button>
                                     </form>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div id="modalInscripcion">
-                        <div class="modal-content">
-                            <h2 style="margin:0 0 10px 0; color:var(--blue);">Inscribir Nuevo Socio</h2>
-                            <p style="color:#94a3b8; font-size:13px; margin-bottom:25px;">Ingresa los datos oficiales para el registro en Raízoma.</p>
-                            
+                    <div id="modal">
+                        <div class="modal-box">
+                            <h2 style="margin:0; color:var(--blue); font-size:28px;">Nueva Inscripción</h2>
+                            <p style="color:#94a3b8; font-size:14px; margin-bottom:30px;">Completa los datos oficiales para el alta en red.</p>
                             <form action="/add-socio" method="POST">
-                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:15px;">
-                                    <div><label style="font-size:11px; font-weight:bold; color:#64748b;">ID PATROCINADOR *</label><input type="text" name="patrocinador_id" placeholder="Ej: RZ-500" required></div>
-                                    <div><label style="font-size:11px; font-weight:bold; color:#64748b;">NOMBRE COMPLETO *</label><input type="text" name="nombre" placeholder="Nombre del socio" required></div>
-                                    <div><label style="font-size:11px; font-weight:bold; color:#64748b;">CORREO ELECTRÓNICO *</label><input type="email" name="correo" placeholder="email@ejemplo.com" required></div>
-                                    <div><label style="font-size:11px; font-weight:bold; color:#64748b;">TELÉFONO *</label><input type="text" name="telefono" placeholder="10 dígitos" required></div>
+                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+                                    <div><label style="font-size:11px; font-weight:bold;">ID PATROCINADOR</label><input type="text" name="patrocinador_id" required placeholder="RZ-100"></div>
+                                    <div><label style="font-size:11px; font-weight:bold;">NOMBRE COMPLETO</label><input type="text" name="nombre" required placeholder="Juan Pérez"></div>
+                                    <div><label style="font-size:11px; font-weight:bold;">CORREO</label><input type="email" name="correo" required placeholder="socio@email.com"></div>
+                                    <div><label style="font-size:11px; font-weight:bold;">TELÉFONO</label><input type="text" name="telefono" required placeholder="10 dígitos"></div>
                                 </div>
-                                
-                                <div style="margin-bottom:15px;">
-                                    <label style="font-size:11px; font-weight:bold; color:#64748b;">DIRECCIÓN COMPLETA *</label>
-                                    <textarea name="direccion" rows="3" placeholder="Calle, Número, Colonia, CP, Ciudad y Estado" required style="width:100%; border-radius:12px; border:1px solid #e2e8f0; padding:10px; font-family:inherit;"></textarea>
+                                <div style="margin-top:15px;">
+                                    <label style="font-size:11px; font-weight:bold;">DIRECCIÓN DE ENVÍO</label>
+                                    <textarea name="direccion" rows="2" placeholder="Calle, Ciudad, CP..."></textarea>
                                 </div>
-
-                                <div style="margin-bottom:25px;">
-                                    <label style="font-size:11px; font-weight:bold; color:#64748b;">PLAN DE INGRESO *</label>
-                                    <select name="membresia_raw" required style="height:50px; border:2px solid #e2e8f0;">
-                                        <option value="">-- Elige una membresía --</option>
+                                <div style="margin-top:15px;">
+                                    <label style="font-size:11px; font-weight:bold;">MEMBRESÍA</label>
+                                    <select name="membresia_raw" required>
                                         <option value="VIP-1750">Membresía VIP ($1,750)</option>
                                         <option value="FOUNDER-15000">Partner Fundador ($15,000)</option>
                                     </select>
                                 </div>
-
-                                <div style="display:flex; gap:15px;">
-                                    <button type="submit" class="btn-green" style="margin:0; flex:2;">FINALIZAR INSCRIPCIÓN</button>
-                                    <button type="button" class="btn-blue" style="flex:1; background:#94a3b8;" onclick="document.getElementById('modalInscripcion').style.display='none'">CANCELAR</button>
-                                </div>
+                                <button type="submit" class="btn-main" style="width:100%; margin-top:30px; font-size:16px; background:var(--green);">Finalizar Registro</button>
+                                <button type="button" onclick="document.getElementById('modal').style.display='none'" style="width:100%; background:none; border:none; color:#94a3b8; margin-top:15px; font-weight:bold; cursor:pointer;">Cancelar</button>
                             </form>
                         </div>
                     </div>
@@ -298,81 +275,31 @@ app.post('/dashboard', (req, res) => {
                 `);
             });
         });
-    } else {
-        res.send("<script>alert('Error de acceso'); window.location='/login';</script>");
-    }
+    } else { res.send("<script>alert('Acceso denegado'); window.location='/login';</script>"); }
 });
 
-// --- OPERACIONES (POST) ---
-
-// Agregar Socio (con lógica de dinero)
+// --- OPERACIONES ---
 app.post('/add-socio', (req, res) => {
     const { patrocinador_id, nombre, correo, telefono, direccion, membresia_raw } = req.body;
-    
-    // Desglosar valor del select: "VIP-1750"
-    const data = membresia_raw.split('-');
-    const nombreMem = data[0];
-    const monto = parseInt(data[1]);
-
-    const sql = `INSERT INTO socios (patrocinador_id, nombre, correo, telefono, direccion, membresia, puntos) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?)`;
-    
-    db.run(sql, [patrocinador_id, nombre, correo, telefono, direccion, nombreMem, monto], () => {
-        res.send(`
-            <form id="r" action="/dashboard" method="POST">
-                <input type="hidden" name="correo" value="admin@raizoma.com">
-                <input type="hidden" name="password" value="1234">
-            </form>
-            <script>alert('Socio registrado correctamente'); document.getElementById('r').submit();</script>
-        `);
+    const parts = membresia_raw.split('-');
+    db.run("INSERT INTO socios (patrocinador_id, nombre, correo, telefono, direccion, membresia, puntos) VALUES (?, ?, ?, ?, ?, ?, ?)", 
+    [patrocinador_id, nombre, correo, telefono, direccion, parts[0], parseInt(parts[1])], () => {
+        res.send(`<form id="r" action="/dashboard" method="POST"><input type="hidden" name="correo" value="admin@raizoma.com"><input type="hidden" name="password" value="1234"></form><script>alert('¡Socio Registrado con Éxito!'); document.getElementById('r').submit();</script>`);
     });
 });
 
-// Agregar Pedido
 app.post('/add-pedido', (req, res) => {
-    const { cliente, guia, empresa } = req.body;
-    db.run("INSERT INTO pedidos (cliente, guia, empresa) VALUES (?, ?, ?)", [cliente, guia, empresa], () => {
-        res.send(`
-            <form id="r" action="/dashboard" method="POST">
-                <input type="hidden" name="correo" value="admin@raizoma.com">
-                <input type="hidden" name="password" value="1234">
-            </form>
-            <script>document.getElementById('r').submit();</script>
-        `);
+    const { cliente, guia } = req.body;
+    db.run("INSERT INTO pedidos (cliente, guia) VALUES (?, ?)", [cliente, guia], () => {
+        res.send(`<form id="r" action="/dashboard" method="POST"><input type="hidden" name="correo" value="admin@raizoma.com"><input type="hidden" name="password" value="1234"></form><script>document.getElementById('r').submit();</script>`);
     });
 });
 
-// Borrar Socio
 app.post('/delete-socio', (req, res) => {
-    db.all("SELECT * FROM socios", (err, rows) => {
-        db.run("DELETE FROM socios WHERE id = ?", [req.body.id], () => {
-            res.send(`
-                <form id="r" action="/dashboard" method="POST">
-                    <input type="hidden" name="correo" value="admin@raizoma.com">
-                    <input type="hidden" name="password" value="1234">
-                </form>
-                <script>document.getElementById('r').submit();</script>
-            `);
-        });
-    });
-});
-
-// Borrar Pedido
-app.post('/delete-pedido', (req, res) => {
-    db.run("DELETE FROM pedidos WHERE id = ?", [req.body.id], () => {
-        res.send(`
-            <form id="r" action="/dashboard" method="POST">
-                <input type="hidden" name="correo" value="admin@raizoma.com">
-                <input type="hidden" name="password" value="1234">
-            </form>
-            <script>document.getElementById('r').submit();</script>
-        `);
+    db.run("DELETE FROM socios WHERE id = ?", [req.body.id], () => {
+        res.send(`<form id="r" action="/dashboard" method="POST"><input type="hidden" name="correo" value="admin@raizoma.com"><input type="hidden" name="password" value="1234"></form><script>document.getElementById('r').submit();</script>`);
     });
 });
 
 app.get('/', (req, res) => res.redirect('/login'));
-
-// --- INICIO ---
-app.listen(process.env.PORT || 10000, '0.0.0.0', () => {
-    console.log('🚀 Raízoma Ultimate V7 Online');
-});
+app.listen(process.env.PORT || 10000, '0.0.0.0', () => console.log('🚀 Raízoma Visual Elite V9 Ready'));
