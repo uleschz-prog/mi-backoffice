@@ -6,11 +6,10 @@ const app = express();
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// 1. CONEXIÓN A BASE DE DATOS
+// 1. BASE DE DATOS
 const dbPath = path.join(__dirname, 'negocio.db');
 const db = new sqlite3.Database(dbPath);
 
-// 2. CREACIÓN DE TABLAS (Asegura que tus apartados existan)
 db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS socios (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -21,7 +20,7 @@ db.serialize(() => {
     )`);
 });
 
-// 3. PANTALLA DE LOGIN
+// 2. PANTALLA DE LOGIN (Diseño limpio)
 app.get('/login', (req, res) => {
     res.send(`
         <!DOCTYPE html>
@@ -33,18 +32,16 @@ app.get('/login', (req, res) => {
             <style>
                 body { font-family: 'Segoe UI', sans-serif; background: #e8f5e9; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
                 .card { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); width: 320px; text-align: center; }
-                h1 { color: #2e7d32; margin-bottom: 20px; }
                 input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; }
-                button { width: 100%; padding: 12px; background: #2e7d32; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 16px; }
-                button:hover { background: #1b5e20; }
+                button { width: 100%; padding: 12px; background: #2e7d32; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; }
             </style>
         </head>
         <body>
             <div class="card">
-                <h1>Raízoma</h1>
+                <h1 style="color: #2e7d32;">Raízoma</h1>
                 <form action="/dashboard" method="POST">
-                    <input type="email" name="correo" placeholder="Correo electrónico" required>
-                    <input type="password" name="password" placeholder="Contraseña" required>
+                    <input type="email" name="correo" placeholder="admin@raizoma.com" required>
+                    <input type="password" name="password" placeholder="1234" required>
                     <button type="submit">ENTRAR</button>
                 </form>
             </div>
@@ -53,28 +50,18 @@ app.get('/login', (req, res) => {
     `);
 });
 
-// 4. DASHBOARD PRINCIPAL (Lee datos de la DB)
+// 3. DASHBOARD (Con botón de apertura forzada)
 app.post('/dashboard', (req, res) => {
     const { correo, password } = req.body;
-    // Validación simple
     if (correo === "admin@raizoma.com" && password === "1234") {
-        
         db.all("SELECT * FROM socios ORDER BY id DESC", [], (err, rows) => {
-            let filasTabla = "";
             let totalPuntos = 0;
-            
-            rows.forEach(socio => {
-                totalPuntos += socio.puntos;
-                filasTabla += \`
-                    <tr>
-                        <td>\${socio.nombre}</td>
-                        <td>\${socio.nivel}</td>
-                        <td>\${socio.puntos} pts</td>
-                        <td><span style="color: #2e7d32; font-weight: bold;">\${socio.estado}</span></td>
-                    </tr>\`;
-            });
+            let filas = rows.map(s => {
+                totalPuntos += s.puntos;
+                return `<tr><td>${s.nombre}</td><td>${s.nivel}</td><td>${s.puntos} pts</td><td>${s.estado}</td></tr>`;
+            }).join('');
 
-            res.send(\`
+            res.send(`
                 <!DOCTYPE html>
                 <html lang="es">
                 <head>
@@ -82,93 +69,69 @@ app.post('/dashboard', (req, res) => {
                     <title>Panel Raízoma</title>
                     <style>
                         body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #f0f2f5; }
-                        header { background: #2e7d32; color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; }
-                        .container { padding: 30px; max-width: 1100px; margin: auto; }
+                        header { background: #2e7d32; color: white; padding: 15px 30px; display: flex; justify-content: space-between; }
+                        .container { padding: 30px; max-width: 1000px; margin: auto; }
                         .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 30px; }
-                        .stat-card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center; }
-                        .stat-card h3 { margin: 0; color: #666; font-size: 14px; text-transform: uppercase; }
-                        .stat-card p { font-size: 28px; font-weight: bold; color: #2e7d32; margin: 10px 0 0; }
-                        table { width: 100%; background: white; border-collapse: collapse; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-                        th { background: #f8f9fa; padding: 18px; text-align: left; color: #444; border-bottom: 2px solid #eee; }
-                        td { padding: 18px; border-bottom: 1px solid #eee; color: #333; }
-                        .btn-new { background: #2e7d32; color: white; padding: 12px 24px; border-radius: 8px; cursor: pointer; border: none; font-weight: bold; font-size: 14px; }
+                        .stat-card { background: white; padding: 20px; border-radius: 10px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+                        table { width: 100%; background: white; border-collapse: collapse; border-radius: 10px; overflow: hidden; }
+                        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; }
+                        .btn-new { background: #2e7d32; color: white; padding: 12px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; }
                         
-                        /* MODAL FLOTANTE */
-                        .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); }
-                        .modal-content { background: white; margin: 10% auto; padding: 30px; border-radius: 15px; width: 400px; }
-                        .modal-input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+                        /* MODAL */
+                        #modalSocio { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 999; }
+                        .modal-content { background: white; width: 350px; margin: 10% auto; padding: 30px; border-radius: 15px; }
                     </style>
                 </head>
                 <body>
-                    <header>
-                        <h2>RAÍZOMA BACKOFFICE</h2>
-                        <a href="/login" style="color: white; text-decoration: none; font-weight: bold;">Cerrar Sesión</a>
-                    </header>
+                    <header><h2>Raízoma</h2><a href="/login" style="color:white; text-decoration:none;">Salir</a></header>
                     <div class="container">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
-                            <h2 style="color: #333;">Resumen de tu Red</h2>
-                            <button type="button" class="btn-new" style="cursor:pointer;" onclick="document.getElementById('modalSocio').style.display='block'">+ NUEVO SOCIO</button>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                            <h3>Mi Red</h3>
+                            <button type="button" class="btn-new" onclick="document.getElementById('modalSocio').style.display='block'">+ NUEVO SOCIO</button>
                         </div>
-                        
                         <div class="stats">
-                            <div class="stat-card"><h3>Socios Activos</h3><p>\${rows.length}</p></div>
-                            <div class="stat-card"><h3>Puntos Totales</h3><p>\${totalPuntos} pts</p></div>
-                            <div class="stat-card"><h3>Comisiones Est.</h3><p>$\${(totalPuntos * 0.1).toFixed(2)}</p></div>
+                            <div class="stat-card"><h3>Socios</h3><p>${rows.length}</p></div>
+                            <div class="stat-card"><h3>Puntos</h3><p>${totalPuntos}</p></div>
+                            <div class="stat-card"><h3>Comisión</h3><p>$${(totalPuntos * 0.1).toFixed(2)}</p></div>
                         </div>
-
                         <table>
-                            <thead>
-                                <tr><th>Nombre</th><th>Nivel</th><th>Puntos</th><th>Estado</th></tr>
-                            </thead>
-                            <tbody>
-                                \${filasTabla || '<tr><td colspan="4" style="text-align: center; color: #999; padding: 40px;">No hay socios registrados todavía.</td></tr>'}
-                            </tbody>
+                            <thead><tr><th>Nombre</th><th>Nivel</th><th>Puntos</th><th>Estado</th></tr></thead>
+                            <tbody>${filas || '<tr><td colspan="4" style="text-align:center;">Sin registros</td></tr>'}</tbody>
                         </table>
                     </div>
 
-                    <div id="modalSocio" class="modal">
+                    <div id="modalSocio">
                         <div class="modal-content">
-                            <h2 style="color: #2e7d32; margin-top: 0;">Inscribir Socio</h2>
-                            <form action="/guardar-socio" method="POST">
-                                <input type="text" name="nombre" class="modal-input" placeholder="Nombre completo" required>
-                                <input type="text" name="nivel" class="modal-input" placeholder="Rango (Ej. Bronce, Plata)" required>
-                                <input type="number" name="puntos" class="modal-input" placeholder="Puntos de compra" required>
-                                <div style="display: flex; gap: 10px; margin-top: 20px;">
-                                    <button type="submit" style="flex: 1; background: #2e7d32; color: white; padding: 12px; border: none; border-radius: 8px; cursor: pointer;">GUARDAR</button>
-                                    <button type="button" onclick="cerrarModal()" style="flex: 1; background: #999; color: white; padding: 12px; border: none; border-radius: 8px; cursor: pointer;">CANCELAR</button>
-                                </div>
+                            <h2 style="color:#2e7d32;">Nuevo Registro</h2>
+                            <form action="/add" method="POST">
+                                <input type="text" name="nombre" placeholder="Nombre" required style="width:100%; padding:10px; margin:8px 0;">
+                                <input type="text" name="nivel" placeholder="Nivel" required style="width:100%; padding:10px; margin:8px 0;">
+                                <input type="number" name="puntos" placeholder="Puntos" required style="width:100%; padding:10px; margin:8px 0;">
+                                <button type="submit" style="width:100%; background:#2e7d32; color:white; padding:10px; border:none; border-radius:5px; margin-top:10px; cursor:pointer;">GUARDAR</button>
+                                <button type="button" onclick="document.getElementById('modalSocio').style.display='none'" style="width:100%; background:#999; color:white; padding:10px; border:none; border-radius:5px; margin-top:5px; cursor:pointer;">CANCELAR</button>
                             </form>
                         </div>
                     </div>
-
-                    <script>
-                        function abrirModal() { document.getElementById('modalSocio').style.display = 'block'; }
-                        function cerrarModal() { document.getElementById('modalSocio').style.display = 'none'; }
-                    </script>
                 </body>
                 </html>
-            \`);
+            `);
         });
     } else {
-        res.send("<script>alert('Datos incorrectos'); window.location='/login';</script>");
+        res.send("<script>alert('Error'); window.location='/login';</script>");
     }
 });
 
-// 5. GUARDAR SOCIO EN LA DB
-app.post('/guardar-socio', (req, res) => {
+// 4. GUARDAR Y RECARGAR
+app.post('/add', (req, res) => {
     const { nombre, nivel, puntos } = req.body;
-    db.run("INSERT INTO socios (nombre, nivel, puntos) VALUES (?, ?, ?)", [nombre, nivel, puntos], (err) => {
-        // Truco para volver al dashboard después de guardar
-        res.send(\`
-            <form id="back" action="/dashboard" method="POST">
+    db.run("INSERT INTO socios (nombre, nivel, puntos) VALUES (?, ?, ?)", [nombre, nivel, puntos], () => {
+        res.send(`
+            <form id="f" action="/dashboard" method="POST">
                 <input type="hidden" name="correo" value="admin@raizoma.com">
                 <input type="hidden" name="password" value="1234">
             </form>
-            <script>
-                alert('Socio guardado con éxito');
-                document.getElementById('back').submit();
-            </script>
-        \`);
+            <script>alert('Registrado'); document.getElementById('f').submit();</script>
+        `);
     });
 });
 
