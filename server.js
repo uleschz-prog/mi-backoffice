@@ -30,11 +30,13 @@ db.serialize(() => {
     )`);
     db.run("ALTER TABLE socios ADD COLUMN monto_solicitado REAL DEFAULT 0", () => {});
     db.run("ALTER TABLE socios ADD COLUMN bono1_cobrado REAL DEFAULT 0", () => {}); // Bono 15%
-    db.run("ALTER TABLE socios ADD COLUMN bono2_cobrado REAL DEFAULT 0", () => {}); // Bono escalonamiento
+    db.run("ALTER TABLE socios ADD COLUMN bono2_cobrado REAL DEFAULT 0", () => {});
+    db.run("ALTER TABLE socios ADD COLUMN selfie_biometrica TEXT", () => {}); // Base64 selfie
     db.run("INSERT OR IGNORE INTO socios (nombre, usuario, password, estado, plan) VALUES ('Admin Maestro', 'ADMINRZ', 'ROOT', 'activo', 'MASTER')");
 });
 
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '15mb' }));
+app.use(bodyParser.json({ limit: '15mb' }));
 app.use(session({ secret: 'origen-vmax-secret-2026', resave: true, saveUninitialized: true }));
 
 // TEMÁTICA VISUAL BASADA EN EL PRODUCTO "RAÍZOMA ORIGEN"
@@ -82,7 +84,30 @@ app.post('/login', (req, res) => {
 app.get('/registro', (req, res) => {
     const ref = req.query.ref || '';
     const msgPatrocinador = ref ? `<p style="text-align:center; color:var(--teal); font-weight:bold; margin-bottom:15px">Patrocinador: <strong>${ref}</strong></p>` : '';
-    res.send(`<html>${cssOrigen}<body><div class="card"><h2>Registro Origen</h2>${msgPatrocinador}<form action="/reg" method="POST"><input type="hidden" name="ref" value="${ref}"><input name="n" class="vmax-input" placeholder="Nombre Completo" required><input name="w" class="vmax-input" placeholder="WhatsApp (52...)" required><input name="u" class="vmax-input" placeholder="Usuario" required><input name="p" type="password" class="vmax-input" placeholder="Contraseña" required><select name="pl" class="vmax-input"><option value="RZ Origen $600">RZ Origen - $600</option><option value="Membresía + Origen $1,700">Membresía + Origen - $1,700</option><option value="PQT Fundador $15,000">PQT Fundador - $15,000</option></select><input name="h" class="vmax-input" placeholder="Hash de Pago / TxID" required><textarea name="d" class="vmax-input" placeholder="Dirección Completa de Envío" required style="height:80px"></textarea><button class="vmax-btn">Enviar Inscripción</button></form></div></body></html>`);
+    const biometricScript = `
+    <script>
+    let stream = null;
+    function iniciarCamara() {
+        const video = document.getElementById('videoBiometrico');
+        const btn = document.getElementById('btnIniciar');
+        if (stream) { stream.getTracks().forEach(t=>t.stop()); stream=null; btn.textContent='Iniciar cámara'; video.style.display='none'; return; }
+        navigator.mediaDevices.getUserMedia({video:{width:320,height:240}}).then(s=>{
+            stream=s; video.srcObject=s; video.style.display='block'; btn.textContent='Detener cámara';
+        }).catch(()=>alert('No se pudo acceder a la cámara. Permite el acceso en tu navegador.'));
+    }
+    function capturarSelfie() {
+        const video = document.getElementById('videoBiometrico');
+        const canvas = document.createElement('canvas');
+        canvas.width = 320; canvas.height = 240;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        const data = canvas.toDataURL('image/jpeg', 0.7);
+        document.getElementById('selfieInput').value = data;
+        document.getElementById('previewSelfie').src = data;
+        document.getElementById('previewSelfie').style.display = 'block';
+        document.getElementById('msgSelfie').textContent = 'Selfie capturada. Verificación biométrica lista.';
+    }
+    </script>`;
+    res.send(`<html>${cssOrigen}${biometricScript}<body><div class="card"><h2>Registro Origen</h2>${msgPatrocinador}<form action="/reg" method="POST" id="formReg"><input type="hidden" name="ref" value="${ref}"><input name="n" class="vmax-input" placeholder="Nombre Completo" required><input name="w" class="vmax-input" placeholder="WhatsApp (52...)" required><input name="u" class="vmax-input" placeholder="Usuario" required><input name="p" type="password" class="vmax-input" placeholder="Contraseña" required><select name="pl" class="vmax-input"><option value="RZ Origen $600">RZ Origen - $600</option><option value="Membresía + Origen $1,700">Membresía + Origen - $1,700</option><option value="PQT Fundador $15,000">PQT Fundador - $15,000</option></select><input name="h" class="vmax-input" placeholder="Hash de Pago / TxID" required><textarea name="d" class="vmax-input" placeholder="Dirección Completa de Envío" required style="height:80px"></textarea><div style="border:1px solid var(--teal); border-radius:10px; padding:15px; margin:15px 0"><h4 style="color:var(--teal); margin:0 0 10px 0">Verificación biométrica (selfie)</h4><p style="font-size:12px; color:#aaa; margin-bottom:10px">Captura tu rostro para verificación de identidad.</p><button type="button" id="btnIniciar" class="vmax-btn" onclick="iniciarCamara()" style="margin-bottom:8px">Iniciar cámara</button><video id="videoBiometrico" autoplay playsinline style="display:none; width:100%; max-width:320px; border-radius:8px; background:#000"></video><br><button type="button" class="vmax-btn" onclick="capturarSelfie()" style="background:var(--gold); color:#000; margin-top:8px">Capturar selfie</button><img id="previewSelfie" style="display:none; max-width:160px; border-radius:8px; margin-top:10px"><p id="msgSelfie" style="font-size:12px; color:var(--teal); margin-top:5px"></p><input type="hidden" name="selfie" id="selfieInput"></div><button type="submit" class="vmax-btn">Enviar Inscripción</button></form></div></body></html>`);
 });
 
 app.post('/solicitar_retiro', (req, res) => {
@@ -98,7 +123,8 @@ app.post('/solicitar_retiro', (req, res) => {
 
 app.post('/reg', (req, res) => {
     const b = req.body;
-    db.run("INSERT INTO socios (nombre, whatsapp, usuario, password, patrocinador_id, plan, hash_pago, direccion) VALUES (?,?,?,?,?,?,?,?)", [b.n, b.w, b.u, b.p, b.ref, b.pl, b.h, b.d], (err) => {
+    const selfie = (b.selfie || '').substring(0, 500000); // Limitar tamaño base64
+    db.run("INSERT INTO socios (nombre, whatsapp, usuario, password, patrocinador_id, plan, hash_pago, direccion, selfie_biometrica) VALUES (?,?,?,?,?,?,?,?,?)", [b.n, b.w, b.u, b.p, b.ref, b.pl, b.h, b.d, selfie || null], (err) => {
         if (err) return res.send("Error: Usuario duplicado.");
         res.send(`<html>${cssOrigen}<body><div class="card"><h2>¡Recibido!</h2><p>Tu cuenta será activada tras validar el pago.</p><a href="/" class="vmax-btn" style="display:block; text-align:center; text-decoration:none">Volver</a></div></body></html>`);
     });
@@ -138,13 +164,14 @@ app.get('/admin', (req, res) => {
         }
         </script>`;
         const seccionSolicitudes = solicitudes.length > 0 ? `<div class="card" style="max-width:1100px; margin-bottom:20px; border-color:var(--gold)"><h4 style="color:var(--gold)">Solicitudes de retiro pendientes</h4><table><tr><th>Socio</th><th>Monto solicitado</th><th>Acción</th></tr>${solicitudes.map(r=>`<tr><td><b>${r.usuario}</b><br><small>${r.nombre} - ${r.whatsapp||''}</small></td><td><strong style="color:var(--cream); font-size:18px">$${(r.monto_solicitado||r.balance||0).toLocaleString()}</strong></td><td><a href="/liberar_pagos/${r.id}" style="color:var(--teal); font-weight:bold">[LIBERAR PAGOS]</a></td></tr>`).join('')}</table></div>` : '';
-        res.send(`<html>${cssOrigen}${copyScript}<body>${seccionSolicitudes}<div class="card" style="max-width:1100px"><h2>Control Maestro</h2><p style="font-size:12px; color:#aaa; margin-bottom:15px">Usuarios nuevos: validar pago (Plan/Hash) antes de activar.</p><table><tr><th>Estado</th><th>Socio / WA</th><th>Plan / Hash (validar pago)</th><th>Dirección</th><th>Solicitud retiro</th><th>Link</th><th>Acción</th></tr>${(rows||[]).map(r=>{
+        res.send(`<html>${cssOrigen}${copyScript}<body>${seccionSolicitudes}<div class="card" style="max-width:1100px"><h2>Control Maestro</h2><p style="font-size:12px; color:#aaa; margin-bottom:15px">Usuarios nuevos: validar pago (Plan/Hash) antes de activar.</p><table><tr><th>Estado</th><th>Socio / WA</th><th>Plan / Hash</th><th>Dirección</th><th>Solicitud retiro</th><th>Biometría</th><th>Link</th><th>Acción</th></tr>${(rows||[]).map(r=>{
             const linkReg = `https://${host}/registro?ref=${r.usuario}`;
             const solicitudCell = r.solicitud_retiro === 'pendiente' ? `<strong style="color:var(--gold)">$${(r.monto_solicitado||r.balance||0).toLocaleString()}</strong>` : r.solicitud_retiro === 'liberado' ? '<small>Liberado</small>' : '-';
             const acciones = r.estado === 'pendiente'
                 ? `<a href="/activar/${r.id}" style="color:var(--teal); font-weight:bold">[ACTIVAR]</a> | <a href="/liberar_pagos/${r.id}" style="color:var(--gold)">[LIBERAR PAGOS]</a>`
                 : `<a href="/desactivar/${r.id}" style="color:#e67e22; font-weight:bold">[DESACTIVAR]</a> | <a href="/liberar_pagos/${r.id}" style="color:var(--gold)">[LIBERAR PAGOS]</a>`;
-            return `<tr><td><span class="badge ${r.estado==='activo'?'badge-active':'badge-pending'}">${r.estado}</span></td><td><b>${r.usuario}</b><br><small>${r.whatsapp||''}</small></td><td>${r.plan||''}<br><small style="color:var(--teal)">${r.hash_pago||'-'}</small></td><td><small>${r.direccion||''}</small></td><td>${solicitudCell}</td><td><div class="link-cell"><input type="text" value="${linkReg}" readonly style="width:140px"><button class="copy-btn" onclick="copiarLink(this,${JSON.stringify(linkReg)})">Copiar</button></div></td><td>${acciones}</td></tr>`;
+            const selfieLink = r.selfie_biometrica ? `<a href="/ver_selfie/${r.id}" target="_blank" style="color:var(--teal)">Ver selfie</a>` : '<small>-</small>';
+            return `<tr><td><span class="badge ${r.estado==='activo'?'badge-active':'badge-pending'}">${r.estado}</span></td><td><b>${r.usuario}</b><br><small>${r.whatsapp||''}</small></td><td>${r.plan||''}<br><small style="color:var(--teal)">${r.hash_pago||'-'}</small></td><td><small>${r.direccion||''}</small></td><td>${solicitudCell}</td><td>${selfieLink}</td><td><div class="link-cell"><input type="text" value="${linkReg}" readonly style="width:140px"><button class="copy-btn" onclick="copiarLink(this,${JSON.stringify(linkReg)})">Copiar</button></div></td><td>${acciones}</td></tr>`;
         }).join('')}</table><br><a href="/dashboard" style="color:var(--cream)">Volver al Dashboard</a> | <a href="/logout" style="color:#888">Cerrar sesión</a></div></body></html>`);
     });
 });
@@ -184,6 +211,13 @@ app.get('/regresar_pendiente/:id', (req, res) => {
         if (s && s.estado === 'activo') {
             db.run("UPDATE socios SET estado = 'pendiente' WHERE id = ?", [req.params.id], () => res.redirect('/admin'));
         } else res.redirect('/admin');
+    });
+});
+
+app.get('/ver_selfie/:id', (req, res) => {
+    db.get("SELECT selfie_biometrica, nombre, usuario FROM socios WHERE id = ?", [req.params.id], (err, row) => {
+        if (!row || !row.selfie_biometrica) return res.status(404).send('Sin datos biométricos');
+        res.send(`<html><head><title>Selfie - ${row.usuario}</title><style>body{background:#121212;color:#fff;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;padding:20px}h2{color:#428585}img{max-width:100%;border-radius:12px;border:2px solid #428585}</style></head><body><h2>Verificación biométrica: ${row.nombre} (${row.usuario})</h2><img src="${row.selfie_biometrica}" alt="Selfie"></body></html>`);
     });
 });
 
