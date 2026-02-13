@@ -1,3 +1,4 @@
+// TIMESTAMP: 2024-05-21-RAIZOMA-CORE-V1
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
@@ -6,8 +7,8 @@ const app = express();
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// Base de datos - Versión estable
-const db = new sqlite3.Database('./raizoma_db.db');
+// Base de datos (Ruta simple para evitar errores de permisos en Render)
+const db = new sqlite3.Database('./database.db');
 
 db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS socios (
@@ -18,7 +19,7 @@ db.serialize(() => {
     )`);
 });
 
-// LÓGICA DE BONOS (Exacta a tu petición)
+// LÓGICA DE BONOS (Según tu plan de compensación)
 function calcularBono(v) {
     if (v >= 60000) return { p: v * 0.20, r: "Senior Managing Partner (20%)" };
     if (v >= 30000) return { p: 4500, r: "Director Partner (Fijo $4,500)" };
@@ -26,7 +27,7 @@ function calcularBono(v) {
     return { p: 0, r: "Socio Activo" };
 }
 
-// DASHBOARD CUENTA MADRE
+// DASHBOARD
 app.get('/', (req, res) => {
     db.all("SELECT * FROM socios ORDER BY id DESC", (err, rows) => {
         res.send(`
@@ -80,4 +81,8 @@ app.post('/reg', (req, res) => {
     db.run("INSERT INTO socios (nombre, direccion, volumen_red) VALUES (?,?,?)", [req.body.n, req.body.d, req.body.v], () => res.redirect('/'));
 });
 
-app.listen(process.env.PORT || 10000, '0.0.0.0');
+// PUERTO: Render requiere que el servidor escuche en 0.0.0.0
+const port = process.env.PORT || 10000;
+app.listen(port, '0.0.0.0', () => {
+    console.log(`Server running on port ${port}`);
+});
