@@ -2,183 +2,254 @@ const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const session = require('express-session');
-const app = express();
+const bodyParser = require('body-parser');
 
-app.use(express.urlencoded({ extended: true }));
+const app = express();
+const port = process.env.PORT || 3000;
+
+// Configuración de Base de Datos en Disco Persistente
+const dbPath = path.join('/data', 'raizoma.db');
+const db = new sqlite3.Database(dbPath, (err) => {
+    if (err) console.error("Error al abrir DB:", err.message);
+    else console.log("Conectado a la base de datos en /data/raizoma.db");
+});
+
+// Crear tablas si no existen
+db.serialize(() => {
+    db.run(`CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT,
+        usuario TEXT UNIQUE,
+        password TEXT,
+        patrocinador_id INTEGER,
+        plan TEXT,
+        hash_pago TEXT,
+        direccion TEXT,
+        status TEXT DEFAULT 'pendiente',
+        balance REAL DEFAULT 0,
+        puntos INTEGER DEFAULT 0
+    )`);
+});
+
+app.use(bodyParser.urlencoded({ extended: true }));
 app.use(session({
-    secret: 'raizoma-super-link-2026',
+    secret: 'raizoma_secret_key',
     resave: false,
     saveUninitialized: true
 }));
 
-const ADMIN_PASSWORD = "RAIZOMA_MASTER_ADMIN"; 
-const dbPath = path.join('/data', 'raizoma.db');
-const db = new sqlite3.Database(dbPath);
+// --- RUTAS DE NAVEGACIÓN ---
 
-db.serialize(() => {
-    db.run(`CREATE TABLE IF NOT EXISTS socios (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        usuario TEXT UNIQUE,
-        password TEXT,
-        nombre TEXT, 
-        direccion TEXT, 
-        patrocinador TEXT, 
-        plan TEXT, 
-        volumen REAL, 
-        hash TEXT, 
-        estado TEXT DEFAULT 'pendiente', 
-        fecha TEXT
-    )`);
-});
-
-function calcularBonos(monto) {
-    const inicio = monto * 0.15;
-    const gestion = (monto >= 15000) ? 1500 : 0;
-    return { total: inicio + gestion, pv: monto / 1000 };
-}
-
-// --- LOGIN ---
+// Login Principal
 app.get('/', (req, res) => {
     res.send(`
-    <body style="background:#0b0e11; color:white; font-family:sans-serif; display:flex; justify-content:center; align-items:center; min-height:100vh; margin:0;">
-        <div style="text-align:center; background:#181a20; padding:40px; border-radius:24px; border:1px solid #334155; width:320px;">
-            <h1 style="color:#3b82f6; margin-bottom:30px;">Raízoma</h1>
-            <form action="/login" method="POST">
-                <input name="user" placeholder="Usuario" style="width:100%; padding:14px; margin-bottom:15px; background:#0b0e11; border:1px solid #334155; border-radius:12px; color:white;" required>
-                <input type="password" name="pass" placeholder="Contraseña" style="width:100%; padding:14px; margin-bottom:20px; background:#0b0e11; border:1px solid #334155; border-radius:12px; color:white;" required>
-                <button style="width:100%; padding:16px; background:#3b82f6; color:white; border:none; border-radius:12px; font-weight:bold; cursor:pointer;">ENTRAR</button>
-            </form>
-            <p style="font-size:12px; color:#94a3b8; margin-top:20px;">¿No tienes cuenta? <a href="/unete" style="color:#3b82f6; text-decoration:none;">Inscríbete aquí</a></p>
-        </div>
-    </body>`);
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Login - Raízoma</title>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+            <style>
+                body { background-color: #0f172a; color: white; display: flex; align-items: center; justify-content: center; height: 100vh; }
+                .login-card { background: #1e293b; padding: 30px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); width: 100%; max-width: 400px; }
+                .btn-primary { background: #3b82f6; border: none; }
+            </style>
+        </head>
+        <body>
+            <div class="login-card text-center">
+                <h2 class="mb-4">🌳 Raízoma</h2>
+                <form action="/login" method="POST">
+                    <input type="text" name="usuario" class="form-control mb-3" placeholder="Usuario" required>
+                    <input type="password" name="password" class="form-control mb-3" placeholder="Contraseña" required>
+                    <button type="submit" class="btn btn-primary w-100 mb-3">Entrar</button>
+                </form>
+                <a href="/registro" class="text-info" style="text-decoration:none;">¿No tienes cuenta? Inscríbete aquí</a>
+            </div>
+        </body>
+        </html>
+    `);
 });
 
-app.post('/login', (req, res) => {
-    const { user, pass } = req.body;
-    if (user === 'admin' && pass === ADMIN_PASSWORD) {
-        req.session.admin = true;
-        return res.redirect('/codigo-1-panel');
-    }
-    db.get("SELECT * FROM socios WHERE usuario = ? AND password = ?", [user, pass], (err, row) => {
-        if (row) { req.session.socio = row; res.redirect('/dashboard'); } 
-        else { res.send('Error. <a href="/">Reintentar</a>'); }
-    });
-});
-
-// --- BACKOFFICE CON LINK DE REFERIDO ---
+// Dashboard del Socio (DISEÑO ACTUALIZADO CON PV)
 app.get('/dashboard', (req, res) => {
     if (!req.session.socio) return res.redirect('/');
     const s = req.session.socio;
-    const refLink = `${req.protocol}://${req.get('host')}/unete?ref=${s.usuario}`;
 
-    db.all("SELECT * FROM socios WHERE patrocinador = ?", [s.usuario], (err, equipo) => {
-        const bonos = s.estado === 'aprobado' ? calcularBonos(s.volumen) : { total: 0, pv: 0 };
-        res.send(`
-        <body style="background:#0b0e11; color:white; font-family:sans-serif; padding:20px;">
-            <div style="max-width:600px; margin:auto;">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <h3>Hola, ${s.nombre}</h3>
-                    <a href="/logout" style="color:#ef4444; text-decoration:none; font-size:12px;">Salir</a>
-                </div>
-                <div style="background:#1e293b; padding:15px; border-radius:15px; margin-bottom:20px; border:1px solid #3b82f6;">
-                    <small style="color:#94a3b8;">Puntos de Volumen (PV)</small>
-                    <div style="font-size:24px; font-weight:bold; color:#10b981; margin-top:5px;">
-                         ${user.puntos || 0} PV
-                    </div>
-                    <small style="color:#64748b;">Acumulado total de tu red activa</small>
-                </div>
-
-                <div style="background:linear-gradient(135deg, #1e293b, #0f172a); padding:30px; border-radius:24px; border:1px solid #334155; margin-bottom:20px;">
-                    <small style="color:#94a3b8;">Comisiones Raízoma</small>
-                    <div style="font-size:38px; font-weight:bold; margin:10px 0;">$${bonos.total.toLocaleString()}</div>
-                    <div style="font-size:12px; color:${s.estado === 'aprobado' ? '#2ecc71' : '#f1c40f'}">ESTATUS: ${s.estado.toUpperCase()}</div>
-                </div>
-
-                <h4 style="color:#3b82f6;">Mi Equipo Directo (${equipo.length})</h4>
-                <div style="background:#181a20; border-radius:18px; border:1px solid #334155; overflow:hidden;">
-                    <table style="width:100%; border-collapse:collapse; font-size:13px;">
-                        <tr style="background:#1e293b; color:#94a3b8;"><th style="padding:12px; text-align:left;">Socio</th><th>Plan</th><th>Estatus</th></tr>
-                        ${equipo.map(e => `
-                            <tr style="border-bottom:1px solid #334155;">
-                                <td style="padding:12px;">${e.nombre}</td>
-                                <td style="text-align:center;">${e.plan}</td>
-                                <td style="text-align:center; color:${e.estado === 'aprobado' ? '#2ecc71' : '#f1c40f'}">${e.estado}</td>
-                            </tr>
-                        `).join('')}
-                    </table>
-                </div>
-            </div>
-            <script>
-                function copyLink() {
-                    var copyText = document.getElementById("refLink");
-                    copyText.select();
-                    document.execCommand("copy");
-                    alert("¡Enlace copiado! Envíalo a tu nuevo socio.");
-                }
-            </script>
-        </body>`);
-    });
-});
-
-// --- REGISTRO CON AUTO-REFERIDO ---
-app.get('/unete', (req, res) => {
-    const patrocinadorSug = req.query.ref || '';
     res.send(`
-    <body style="background:#0b0e11; color:white; font-family:sans-serif; display:flex; justify-content:center; align-items:center; min-height:100vh; padding:20px;">
-        <form action="/reg" method="POST" style="background:#181a20; padding:35px; border-radius:24px; width:100%; max-width:400px; border:1px solid #334155;">
-            <h2 style="text-align:center;">Nueva Inscripción</h2>
-            <input name="user" placeholder="Usuario (ID único)" style="width:100%; margin-bottom:10px; padding:12px; background:#0b0e11; border:1px solid #334155; border-radius:10px; color:white;" required>
-            <input type="password" name="pass" placeholder="Contraseña" style="width:100%; margin-bottom:20px; padding:12px; background:#0b0e11; border:1px solid #334155; border-radius:10px; color:white;" required>
-            <input name="n" placeholder="Nombre completo" style="width:100%; margin-bottom:10px; padding:12px; background:#0b0e11; border:1px solid #334155; border-radius:10px; color:white;" required>
-            <input name="dir" placeholder="Dirección de envío" style="width:100%; margin-bottom:10px; padding:12px; background:#0b0e11; border:1px solid #334155; border-radius:10px; color:white;" required>
-            <input name="pat" placeholder="Usuario Patrocinador" value="${patrocinadorSug}" style="width:100%; margin-bottom:10px; padding:12px; background:#0b0e11; border:1px solid #3b82f6; border-radius:10px; color:white;" required>
-            <select name="plan_monto" style="width:100%; margin-bottom:15px; padding:12px; background:#0b0e11; border:1px solid #334155; border-radius:10px; color:white;">
-                <option value="VIP|1750">Membresía VIP - $1,750</option>
-                <option value="Partner|15000">Partner Fundador - $15,000</option>
-            </select>
-            <input name="hash" placeholder="Hash de Pago (TxID)" style="width:100%; margin-bottom:20px; padding:12px; background:#0b0e11; border:1px solid #334155; border-radius:10px; color:white;" required>
-            <button type="submit" style="width:100%; padding:18px; background:#3b82f6; color:white; border:none; border-radius:14px; font-weight:bold; cursor:pointer;">FINALIZAR INSCRIPCIÓN</button>
-        </form>
-    </body>`);
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Oficina - Raízoma</title>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+            <style>
+                body { background-color: #0f172a; color: white; font-family: sans-serif; }
+                .card-custom { background: #1e293b; border-radius: 15px; border: 1px solid #334155; padding: 20px; margin-bottom: 20px; }
+                .btn-copy { background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 10px; font-weight: bold; width: 100%; }
+            </style>
+        </head>
+        <body class="p-4">
+            <div class="container" style="max-width: 500px;">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2>Hola, <span style="color:#3b82f6;">${s.nombre}</span></h2>
+                    <a href="/logout" class="btn btn-sm btn-outline-danger">Salir</a>
+                </div>
+                
+                <div class="card-custom">
+                    <small style="color:#94a3b8;">Tu Enlace de Invitación</small>
+                    <input type="text" id="referralLink" class="form-control my-2" value="https://mi-backoffice-ra8q.onrender.com/registro?ref=${s.id}" readonly style="background:#0f172a; color:white; border:1px solid #334155;">
+                    <button class="btn-copy" onclick="copyLink()">Copiar Enlace</button>
+                </div>
+
+                <div class="card-custom" style="border-color: #10b981;">
+                    <small style="color:#94a3b8;">Puntos de Volumen (PV)</small>
+                    <div style="font-size:28px; font-weight:bold; color:#10b981; margin-top:5px;">
+                        ${s.puntos || 0} PV
+                    </div>
+                    <small style="color:#64748b;">Estatus: <span style="color:${s.status === 'activo' ? '#10b981' : '#f59e0b'}">${s.status.toUpperCase()}</span></small>
+                </div>
+
+                <div class="card-custom">
+                    <small style="color:#94a3b8;">Comisiones Acumuladas</small>
+                    <div style="font-size:32px; font-weight:bold; color:#3b82f6; margin-top:5px;">
+                        $${s.balance || 0}
+                    </div>
+                </div>
+
+                <script>
+                    function copyLink() {
+                        var copyText = document.getElementById("referralLink");
+                        copyText.select();
+                        copyText.setSelectionRange(0, 99999);
+                        navigator.clipboard.writeText(copyText.value);
+                        alert("¡Enlace copiado!");
+                    }
+                </script>
+            </div>
+        </body>
+        </html>
+    `);
 });
 
-app.post('/reg', (req, res) => {
-    const [plan, monto] = req.body.plan_monto.split('|');
-    db.run("INSERT INTO socios (usuario, password, nombre, direccion, patrocinador, plan, volumen, hash, fecha) VALUES (?,?,?,?,?,?,?,?,?)", 
-    [req.body.user, req.body.pass, req.body.n, req.body.dir, req.body.pat, plan, monto, req.body.hash, new Date().toLocaleDateString()], 
-    () => res.send('<body style="background:#0b0e11; color:white; text-align:center; padding-top:100px;"><h2>¡Socio Registrado!</h2><a href="/" style="color:#3b82f6;">Regresar</a></body>'));
+// Registro de Socios
+app.get('/registro', (req, res) => {
+    const ref = req.query.ref || '';
+    res.send(`
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Registro - Raízoma</title>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+            <style>
+                body { background-color: #0f172a; color: white; padding: 20px; }
+                .form-card { background: #1e293b; padding: 25px; border-radius: 20px; max-width: 500px; margin: auto; }
+            </style>
+        </head>
+        <body>
+            <div class="form-card">
+                <h3 class="mb-4 text-center">Inscripción Raízoma</h3>
+                <form action="/registro" method="POST">
+                    <input type="hidden" name="patrocinador_id" value="${ref}">
+                    <div class="mb-3"><label>Nombre Completo</label><input type="text" name="nombre" class="form-control" required></div>
+                    <div class="mb-3"><label>Usuario</label><input type="text" name="usuario" class="form-control" required></div>
+                    <div class="mb-3"><label>Contraseña</label><input type="password" name="password" class="form-control" required></div>
+                    <div class="mb-3">
+                        <label>Plan de Ingreso</label>
+                        <select name="plan" class="form-select">
+                            <option value="Partner">Partner - $15,000 MXN</option>
+                            <option value="Pro">Pro - $30,000 MXN</option>
+                        </select>
+                    </div>
+                    <div class="mb-3"><label>Hash de Pago (TxID)</label><input type="text" name="hash_pago" class="form-control" required></div>
+                    <div class="mb-3"><label>Dirección de Envío</label><textarea name="direccion" class="form-control" required></textarea></div>
+                    <button type="submit" class="btn btn-success w-100">Finalizar Registro</button>
+                </form>
+            </div>
+        </body>
+        </html>
+    `);
 });
 
-// --- PANEL CÓDIGO 1 ---
-app.get('/codigo-1-panel', (req, res) => {
-    if (!req.session.admin) return res.redirect('/');
-    db.all("SELECT * FROM socios", (err, rows) => {
-        res.send(`
-        <body style="background:#0b0e11; color:white; font-family:sans-serif; padding:20px;">
-            <h2>Admin Master: Control de Red</h2>
-            <table border="1" style="width:100%; border-collapse:collapse; background:#181a20; font-size:12px;">
-                <tr style="background:#334155;"><th>Usuario</th><th>Socio</th><th>Patrocinador</th><th>Plan</th><th>Acción</th></tr>
-                ${rows.map(r => `
-                <tr>
-                    <td style="padding:10px;">${r.usuario}</td>
-                    <td>${r.nombre}<br><small>${r.direccion}</small></td>
-                    <td>${r.patrocinador}</td>
-                    <td>${r.plan} ($${r.volumen})</td>
-                    <td>${r.estado === 'pendiente' ? `<a href="/activar/${r.id}" style="color:#3b82f6;">[APROBAR]</a>` : '✅ ACTIVO'}</td>
-                </tr>`).join('')}
-            </table>
-            <br><a href="/logout" style="color:white;">Salir</a>
-        </body>`);
+// --- LÓGICA DE DATOS ---
+
+app.post('/login', (req, res) => {
+    const { usuario, password } = req.body;
+    db.get("SELECT * FROM users WHERE usuario = ? AND password = ?", [usuario, password], (err, row) => {
+        if (row) {
+            req.session.socio = row;
+            res.redirect('/dashboard');
+        } else {
+            res.send("<script>alert('Datos incorrectos'); window.location='/';</script>");
+        }
     });
 });
 
-app.get('/activar/:id', (req, res) => {
-    if (!req.session.admin) return res.send('No');
-    db.run(`UPDATE users SET status = 'activo', puntos = puntos + 100 WHERE id = ?`, [userId], (err) => {
-    if (err) console.error("Error al sumar puntos");
+app.post('/registro', (req, res) => {
+    const { nombre, usuario, password, patrocinador_id, plan, hash_pago, direccion } = req.body;
+    db.run(`INSERT INTO users (nombre, usuario, password, patrocinador_id, plan, hash_pago, direccion) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [nombre, usuario, password, patrocinador_id, plan, hash_pago, direccion],
+        function(err) {
+            if (err) return res.send("Error al registrar: " + err.message);
+            res.send("<h1>¡Registro enviado!</h1><p>Tu cuenta será activada cuando confirmemos tu pago.</p><a href='/'>Ir al Login</a>");
+        }
+    );
 });
 
-app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/'); });
+// Panel de Administración Maestro (Código 1)
+app.get('/codigo-1-panel', (req, res) => {
+    res.send(`
+        <body style="font-family:sans-serif; padding:40px;">
+            <h2>Panel Maestro de Activaciones</h2>
+            <form action="/admin-auth" method="POST">
+                <input type="password" name="master_pass" placeholder="Password Maestro">
+                <button type="submit">Entrar</button>
+            </form>
+        </body>
+    `);
+});
 
-const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log('Raízoma V10: Link de Referencia Activo'));
+app.post('/admin-auth', (req, res) => {
+    if (req.body.master_pass === 'RAIZOMA_MASTER_ADMIN') {
+        db.all("SELECT * FROM users", (err, rows) => {
+            let html = "<h1>Socios Registrados</h1><table border='1'><tr><th>Nombre</th><th>Plan</th><th>Hash</th><th>Acción</th></tr>";
+            rows.forEach(user => {
+                html += `<tr>
+                    <td>${user.nombre}</td>
+                    <td>${user.plan}</td>
+                    <td>${user.hash_pago}</td>
+                    <td><a href='/aprobar/${user.id}'>[APROBAR]</a></td>
+                </tr>`;
+            });
+            res.send(html + "</table>");
+        });
+    } else {
+        res.send("Acceso Denegado");
+    }
+});
+
+// Función de Aprobación (Suma Puntos)
+app.get('/aprobar/:id', (req, res) => {
+    const userId = req.params.id;
+    // Aprobar usuario y sumar 100 puntos al patrocinador
+    db.get("SELECT patrocinador_id FROM users WHERE id = ?", [userId], (err, user) => {
+        if (user && user.patrocinador_id) {
+            db.run("UPDATE users SET puntos = puntos + 100 WHERE id = ?", [user.patrocinador_id]);
+        }
+        db.run("UPDATE users SET status = 'activo' WHERE id = ?", [userId], () => {
+            res.send("<h1>Socio Activado y Puntos Sumados</h1><a href='/codigo-1-panel'>Regresar</a>");
+        });
+    });
+});
+
+app.get('/logout', (req, res) => {
+    req.session.destroy();
+    res.redirect('/');
+});
+
+app.listen(port, () => {
+    console.log(`Servidor Raízoma corriendo en puerto ${port}`);
+});
