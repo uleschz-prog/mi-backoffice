@@ -28,7 +28,9 @@ db.serialize(() => {
         balance REAL DEFAULT 0, puntos INTEGER DEFAULT 0, volumen_red REAL DEFAULT 0,
         bono_cobrado REAL DEFAULT 0, solicitud_retiro TEXT DEFAULT 'no', detalles_retiro TEXT
     )`);
-    db.run("ALTER TABLE socios ADD COLUMN monto_solicitado REAL DEFAULT 0", () => {}); // Migración; ignora si ya existe
+    db.run("ALTER TABLE socios ADD COLUMN monto_solicitado REAL DEFAULT 0", () => {});
+    db.run("ALTER TABLE socios ADD COLUMN bono1_cobrado REAL DEFAULT 0", () => {}); // Bono 15%
+    db.run("ALTER TABLE socios ADD COLUMN bono2_cobrado REAL DEFAULT 0", () => {}); // Bono escalonamiento
     db.run("INSERT OR IGNORE INTO socios (nombre, usuario, password, estado, plan) VALUES ('Admin Maestro', 'ADMINRZ', 'ROOT', 'activo', 'MASTER')");
 });
 
@@ -111,7 +113,12 @@ app.get('/dashboard', (req, res) => {
             const linkRef = `https://${req.get('host')}/registro?ref=${s.usuario}`;
             const copyScript = `<script>function copiarLink(){navigator.clipboard.writeText('${linkRef}').then(()=>{const b=document.getElementById('btnCopy');b.textContent='¡Copiado!';setTimeout(()=>b.textContent='Copiar link',1500)})}</script>`;
             const btnSolicitar = (s.balance > 0 && s.solicitud_retiro !== 'pendiente' && s.solicitud_retiro !== 'liberado') ? `<form action="/solicitar_retiro" method="POST" style="margin-top:15px"><input type="hidden" name="monto" value="${s.balance}"><button type="submit" class="vmax-btn" style="background:var(--gold); color:#000">Solicitar retiro de comisiones ($${s.balance.toLocaleString()})</button></form>` : s.solicitud_retiro === 'pendiente' ? `<p style="color:var(--gold); font-size:12px; margin-top:10px">Solicitud pendiente: $${(s.monto_solicitado||s.balance).toLocaleString()}</p>` : '';
-            res.send(`<html>${cssOrigen}${copyScript}<body><div class="card"><h3>Bienvenido, ${s.nombre}</h3><div class="stat-grid" style="grid-template-columns: repeat(3, 1fr)"><div class="stat-box"><span class="val">${s.puntos.toLocaleString()}</span><span class="label">PV Acumulados</span></div><div class="stat-box"><span class="val">$${s.balance.toLocaleString()}</span><span class="label">Balance MXN</span></div><div class="stat-box"><span class="val">$${(s.bono_cobrado||0).toLocaleString()}</span><span class="label">Bonos cobrados (total)</span></div></div><div class="bar-bg"><div class="bar-fill" style="width:${porc}%"></div></div><p style="text-align:center; font-size:11px; color:var(--teal)">Progreso hacia bono: ${meta.toLocaleString()} PV</p>${btnSolicitar}</div><div class="card"><h4>Mi Link de Referido:</h4><div class="link-cell"><input class="vmax-input" value="${linkRef}" readonly style="flex:1; margin-right:8px"><button id="btnCopy" class="copy-btn" onclick="copiarLink()">Copiar link</button></div><h4>Estructura Directa</h4><table><tr><th>Socio</th><th>Plan</th><th>Estado</th></tr>${(red||[]).map(i=>`<tr><td>${i.nombre}</td><td>${i.plan}</td><td><span class="badge ${i.estado==='activo'?'badge-active':'badge-pending'}">${i.estado}</span></td></tr>`).join('')}</table></div>${s.usuario==='ADMINRZ'?'<a href="/admin" class="vmax-btn" style="background:var(--gold); color:#000; text-decoration:none; display:block; text-align:center">Panel Administrativo</a>':''}</body></html>`);
+            const b1 = s.bono1_cobrado || 0;
+            const b2 = s.bono2_cobrado || 0;
+            const bonoTotal = (s.bono_cobrado || 0);
+            const desgloseBonos = `<div style="background:rgba(66,133,133,0.08); border:1px solid rgba(66,133,133,0.3); border-radius:12px; padding:15px; margin:15px 0"><h4 style="color:var(--teal); margin:0 0 10px 0">Detalle de bonos cobrados</h4><table style="width:100%"><tr><td><strong>Bono 1 (15% directo)</strong></td><td style="color:var(--cream); font-size:18px; text-align:right">$${b1.toLocaleString()}</td></tr><tr><td><strong>Bono 2 (Escalonamiento)</strong></td><td style="color:var(--cream); font-size:18px; text-align:right">$${b2.toLocaleString()}</td></tr><tr><td><strong>Total bonos</strong></td><td style="color:var(--teal); font-size:20px; text-align:right">$${bonoTotal.toLocaleString()}</td></tr></table></div>`;
+            const btnLogout = `<a href="/logout" class="vmax-btn" style="background:#555; color:var(--cream); text-decoration:none; display:block; text-align:center; margin-top:10px">Cerrar sesión</a>`;
+            res.send(`<html>${cssOrigen}${copyScript}<body><div class="card"><h3>Bienvenido, ${s.nombre}</h3><div class="stat-grid" style="grid-template-columns: repeat(3, 1fr)"><div class="stat-box"><span class="val">${s.puntos.toLocaleString()}</span><span class="label">PV Acumulados</span></div><div class="stat-box"><span class="val">$${s.balance.toLocaleString()}</span><span class="label">Balance MXN</span></div><div class="stat-box"><span class="val">$${bonoTotal.toLocaleString()}</span><span class="label">Bonos cobrados (total)</span></div></div>${desgloseBonos}<div class="bar-bg"><div class="bar-fill" style="width:${porc}%"></div></div><p style="text-align:center; font-size:11px; color:var(--teal)">Progreso hacia bono: ${meta.toLocaleString()} PV</p>${btnSolicitar}${btnLogout}</div><div class="card"><h4>Mi Link de Referido:</h4><div class="link-cell"><input class="vmax-input" value="${linkRef}" readonly style="flex:1; margin-right:8px"><button id="btnCopy" class="copy-btn" onclick="copiarLink()">Copiar link</button></div><h4>Estructura Directa</h4><table><tr><th>Socio</th><th>Plan</th><th>Estado</th></tr>${(red||[]).map(i=>`<tr><td>${i.nombre}</td><td>${i.plan}</td><td><span class="badge ${i.estado==='activo'?'badge-active':'badge-pending'}">${i.estado}</span></td></tr>`).join('')}</table></div>${s.usuario==='ADMINRZ'?'<a href="/admin" class="vmax-btn" style="background:var(--gold); color:#000; text-decoration:none; display:block; text-align:center">Panel Administrativo</a>':''}</body></html>`);
         });
     });
 });
@@ -136,9 +143,9 @@ app.get('/admin', (req, res) => {
             const solicitudCell = r.solicitud_retiro === 'pendiente' ? `<strong style="color:var(--gold)">$${(r.monto_solicitado||r.balance||0).toLocaleString()}</strong>` : r.solicitud_retiro === 'liberado' ? '<small>Liberado</small>' : '-';
             const acciones = r.estado === 'pendiente'
                 ? `<a href="/activar/${r.id}" style="color:var(--teal); font-weight:bold">[ACTIVAR]</a> | <a href="/liberar_pagos/${r.id}" style="color:var(--gold)">[LIBERAR PAGOS]</a>`
-                : `<a href="/regresar_pendiente/${r.id}" style="color:#e67e22; font-weight:bold">[REGRESAR PENDIENTE]</a> | <a href="/liberar_pagos/${r.id}" style="color:var(--gold); font-weight:bold">[LIBERAR PAGOS]</a>`;
+                : `<a href="/desactivar/${r.id}" style="color:#e67e22; font-weight:bold">[DESACTIVAR]</a> | <a href="/liberar_pagos/${r.id}" style="color:var(--gold)">[LIBERAR PAGOS]</a>`;
             return `<tr><td><span class="badge ${r.estado==='activo'?'badge-active':'badge-pending'}">${r.estado}</span></td><td><b>${r.usuario}</b><br><small>${r.whatsapp||''}</small></td><td>${r.plan||''}<br><small style="color:var(--teal)">${r.hash_pago||'-'}</small></td><td><small>${r.direccion||''}</small></td><td>${solicitudCell}</td><td><div class="link-cell"><input type="text" value="${linkReg}" readonly style="width:140px"><button class="copy-btn" onclick="copiarLink(this,${JSON.stringify(linkReg)})">Copiar</button></div></td><td>${acciones}</td></tr>`;
-        }).join('')}</table><br><a href="/dashboard" style="color:var(--cream)">Volver al Dashboard</a></div></body></html>`);
+        }).join('')}</table><br><a href="/dashboard" style="color:var(--cream)">Volver al Dashboard</a> | <a href="/logout" style="color:#888">Cerrar sesión</a></div></body></html>`);
     });
 });
 
@@ -149,15 +156,25 @@ app.get('/activar/:id', (req, res) => {
             db.run("UPDATE socios SET estado = 'activo' WHERE id = ?", [req.params.id], () => {
                 if (s.patrocinador_id) {
                     db.run("UPDATE socios SET puntos = puntos + ?, volumen_red = volumen_red + ? WHERE usuario = ?", [valPlan, valPlan, s.patrocinador_id], () => {
-                        db.get("SELECT puntos, bono_cobrado FROM socios WHERE usuario = ?", [s.patrocinador_id], (err, p) => {
-                            let totalBono = p.puntos >= 60000 ? 12000 : (p.puntos >= 30000 ? 6000 : (p.puntos >= 15000 ? 1500 : 0));
-                            let dif = totalBono - (p.bono_cobrado || 0);
-                            if (dif > 0) db.run("UPDATE socios SET balance = balance + ?, bono_cobrado = bono_cobrado + ? WHERE usuario = ?", [dif, dif, s.patrocinador_id]);
+                        db.get("SELECT puntos, bono_cobrado, bono1_cobrado, bono2_cobrado FROM socios WHERE usuario = ?", [s.patrocinador_id], (err, p) => {
+                            const bono1Add = valPlan * 0.15; // Bono 1: 15% directo por activación
+                            const totalBono = p.puntos >= 60000 ? 12000 : (p.puntos >= 30000 ? 6000 : (p.puntos >= 15000 ? 1500 : 0));
+                            const bono2Add = Math.max(0, totalBono - (p.bono_cobrado || 0)); // Bono 2: Escalonamiento (por meta PV)
+                            const totalAdd = bono1Add + bono2Add;
+                            if (totalAdd > 0) db.run("UPDATE socios SET balance = balance + ?, bono_cobrado = bono_cobrado + ?, bono1_cobrado = bono1_cobrado + ?, bono2_cobrado = bono2_cobrado + ? WHERE usuario = ?", [totalAdd, totalAdd, bono1Add, bono2Add, s.patrocinador_id]);
                         });
                     });
                 }
                 res.redirect('/admin');
             });
+        } else res.redirect('/admin');
+    });
+});
+
+app.get('/desactivar/:id', (req, res) => {
+    db.get("SELECT * FROM socios WHERE id = ?", [req.params.id], (err, s) => {
+        if (s && s.estado === 'activo' && s.usuario !== 'ADMINRZ') {
+            db.run("UPDATE socios SET estado = 'pendiente' WHERE id = ?", [req.params.id], () => res.redirect('/admin'));
         } else res.redirect('/admin');
     });
 });
