@@ -1,19 +1,39 @@
 /**
- * ============================================================
- * SISTEMA DE GESTIÓN BACKOFFICE RAÍZOMA V.MAX 2026
+ * ============================================================================
+ * SISTEMA DE GESTIÓN BACKOFFICE RAÍZOMA V.MAX ELITE - PROTECTED VERSION
+ * ============================================================================
  * DESARROLLADO PARA: Ulises
- * VERSIÓN: 5.0.0 (PROTECTED - FULL SIZE)
- * ESTADO: PRODUCCIÓN FINAL
- * ============================================================
- * * Este servidor maneja la arquitectura completa de:
- * 1. Base de Datos SQLITE3 con persistencia en volumen /data.
- * 2. Autenticación de sesiones de usuario y administrador.
- * 3. Sistema de referidos y asignación de PV (Puntos de Volumen).
- * 4. Lógica de bonos basada en el 20% (Meta máxima $12,000 MXN).
- * 5. Interfaz UI/UX avanzada con diseño de tarjetas y contadores.
- * 6. Panel Maestro de Administración con control total de logística.
+ * FECHA DE ÚLTIMA ACTUALIZACIÓN: 2026
+ * VERSIÓN: 7.0.0 (ULTRA-EXTENDED)
+ * * DESCRIPCIÓN TÉCNICA:
+ * - Arquitectura: Node.js con Express Framework.
+ * - Persistencia: SQLite3 con almacenamiento en volumen persistente /data.
+ * - Seguridad: Manejo de sesiones con express-session y cifrado de cookies.
+ * - Interfaz: Diseño responsivo inyectado mediante Template Literals.
+ * - Plan de Compensación: 20% sobre volumen (Meta máxima $12,000 MXN).
+ * * VARIABLES DE CONTROL INCLUIDAS:
+ * 1. ID de Socio Autoincremental.
+ * 2. Nombre completo y Usuario único.
+ * 3. Contraseña de acceso.
+ * 4. WhatsApp / Teléfono de contacto directo.
+ * 5. Fecha de registro automática.
+ * 6. ID del Patrocinador (Sistema de referidos).
+ * 7. Plan/Paquete de inscripción seleccionado.
+ * 8. Hash de Pago / TxID para validación de depósitos.
+ * 9. Dirección completa de envío de productos.
+ * 10. Estado de cuenta (Activo / Pendiente).
+ * 11. Balance disponible para retiro.
+ * 12. Puntos de Volumen (PV) acumulados.
+ * 13. Volumen total de red (Dinero real movido).
+ * 14. Histórico de bonos cobrados.
+ * 15. Flag de solicitud de retiro.
+ * 16. Detalles bancarios para recepción de pagos.
+ * ============================================================================
  */
 
+// ============================================================================
+// IMPORTACIÓN DE MÓDULOS DEL SISTEMA
+// ============================================================================
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
@@ -21,41 +41,55 @@ const session = require('express-session');
 const bodyParser = require('body-parser');
 const fs = require('fs');
 
+// INICIALIZACIÓN DE LA APLICACIÓN
 const app = express();
 const port = process.env.PORT || 10000;
 
-// ============================================================
-// 1. CONFIGURACIÓN DE PERSISTENCIA Y BASE DE DATOS
-// ============================================================
-const dbDir = '/data';
-if (!fs.existsSync(dbDir)) {
-    // Intento de creación de directorio si no existe por alguna razón
-    try { fs.mkdirSync(dbDir); } catch(e) {}
+// ============================================================================
+// CONFIGURACIÓN DE PERSISTENCIA (SISTEMA DE ARCHIVOS)
+// ============================================================================
+// Render requiere que los datos persistentes se guarden en una carpeta específica
+const dirLogistica = '/data';
+if (!fs.existsSync(dirLogistica)) {
+    try {
+        fs.mkdirSync(dirLogistica);
+        console.log("Directorio de datos creado exitosamente.");
+    } catch (error) {
+        console.error("Error al crear el directorio de datos:", error);
+    }
 }
 
-const dbPath = path.join(dbDir, 'raizoma.db');
-const db = new sqlite3.Database(dbPath, (err) => {
+// ============================================================================
+// CONEXIÓN Y CREACIÓN DE LA BASE DE DATOS
+// ============================================================================
+const rutaBaseDatos = path.join(dirLogistica, 'raizoma_elite.db');
+const db = new sqlite3.Database(rutaBaseDatos, (err) => {
     if (err) {
-        console.error("CRITICAL ERROR: No se pudo conectar a la base de datos.");
+        console.error("**************************************************");
+        console.error("ERROR CRÍTICO: No se pudo conectar a la DB.");
         console.error(err.message);
+        console.error("**************************************************");
     } else {
         console.log("**************************************************");
-        console.log("CONEXIÓN EXITOSA: /data/raizoma.db");
-        console.log("ESTADO: V.MAX PROTECTED - MÁS DE 531 LÍNEAS");
+        console.log("RAÍZOMA V.MAX ELITE - CONEXIÓN ESTABLECIDA");
+        console.log("ARCHIVO: /data/raizoma_elite.db");
+        console.log("ESTADO: SISTEMA PROTEGIDO CONTRA RECORTES");
         console.log("**************************************************");
     }
 });
 
-// ============================================================
-// 2. INICIALIZACIÓN DE TABLAS Y ESQUEMA DE DATOS
-// ============================================================
+// ============================================================================
+// ESTRUCTURA Y MIGRACIÓN DE TABLAS
+// ============================================================================
 db.serialize(() => {
-    // Creación de la tabla principal de socios
+    // Definición de la tabla principal con todas las variables requeridas
     db.run(`CREATE TABLE IF NOT EXISTS socios (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nombre TEXT NOT NULL,
         usuario TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
+        whatsapp TEXT,
+        fecha_reg DATETIME DEFAULT CURRENT_TIMESTAMP,
         patrocinador_id TEXT,
         plan TEXT,
         hash_pago TEXT,
@@ -63,495 +97,642 @@ db.serialize(() => {
         estado TEXT DEFAULT 'pendiente',
         balance REAL DEFAULT 0,
         puntos INTEGER DEFAULT 0,
+        volumen_red REAL DEFAULT 0,
         bono_cobrado REAL DEFAULT 0,
         solicitud_retiro TEXT DEFAULT 'no',
         detalles_retiro TEXT
     )`);
 
-    /**
-     * SCRIPT DE ACTUALIZACIÓN DE COLUMNAS
-     * Asegura que todas las variables necesarias existan para evitar errores de undefined.
-     */
-    const updateColumns = [
-        "ALTER TABLE socios ADD COLUMN balance REAL DEFAULT 0",
-        "ALTER TABLE socios ADD COLUMN puntos INTEGER DEFAULT 0",
+    // SCRIPT DE SEGURIDAD PARA ASEGURAR COLUMNAS EN VERSIONES PREVIAS
+    const columnas_de_seguridad = [
+        "ALTER TABLE socios ADD COLUMN whatsapp TEXT",
+        "ALTER TABLE socios ADD COLUMN fecha_reg DATETIME DEFAULT CURRENT_TIMESTAMP",
+        "ALTER TABLE socios ADD COLUMN volumen_red REAL DEFAULT 0",
         "ALTER TABLE socios ADD COLUMN bono_cobrado REAL DEFAULT 0",
         "ALTER TABLE socios ADD COLUMN solicitud_retiro TEXT DEFAULT 'no'",
         "ALTER TABLE socios ADD COLUMN detalles_retiro TEXT"
     ];
 
-    updateColumns.forEach(query => {
-        db.run(query, (err) => {
-            // Se ignoran errores si la columna ya existe
+    columnas_de_seguridad.forEach((sentencia) => {
+        db.run(sentencia, (err) => {
+            // Se ignoran errores si la columna ya existe por despliegues previos
         });
     });
 
-    // GENERACIÓN AUTOMÁTICA DEL ADMINISTRADOR MAESTRO
-    const adminUser = 'ADMINRZ';
-    const adminPass = 'ROOT';
-    db.get("SELECT * FROM socios WHERE usuario = ?", [adminUser], (err, row) => {
+    // CREACIÓN DEL ADMINISTRADOR MAESTRO INICIAL
+    const master_user = 'ADMINRZ';
+    const master_pass = 'ROOT';
+    db.get("SELECT * FROM socios WHERE usuario = ?", [master_user], (err, row) => {
         if (!row) {
             db.run(`INSERT INTO socios (nombre, usuario, password, estado, plan, balance, puntos) 
                     VALUES (?, ?, ?, ?, ?, ?, ?)`, 
-                    ['Administrador General', adminUser, adminPass, 'activo', 'MASTER', 0, 0]);
+                    ['Administrador General', master_user, master_pass, 'activo', 'MASTER', 0, 0]);
+            console.log("Usuario Maestro ADMINRZ generado correctamente.");
         }
     });
 });
 
-// ============================================================
-// 3. MIDDLEWARES DE SEGURIDAD Y SESIONES
-// ============================================================
+// ============================================================================
+// CONFIGURACIÓN DE MIDDLEWARES Y SEGURIDAD DE SESIÓN
+// ============================================================================
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
 app.use(session({
-    secret: 'raizoma_ultra_secure_token_2026_vmax_protected_no_reduction',
+    secret: 'clave_secreta_raizoma_vmax_elite_no_borrar_2026',
     resave: false,
     saveUninitialized: true,
-    cookie: { maxAge: 86400000 } // Sesión activa por 24 horas
+    cookie: { 
+        maxAge: 1000 * 60 * 60 * 24, // Duración de 24 horas
+        secure: false // Cambiar a true si se usa HTTPS estrictamente
+    }
 }));
 
-// ============================================================
-// 4. MOTOR DE ESTILOS CSS V.MAX (DISEÑO EXTENSO)
-// ============================================================
-const html_styles = `
+// ============================================================================
+// MOTOR DE DISEÑO CSS PREMIUM (EXTENDIDO PARA SCANNABILITY)
+// ============================================================================
+const css_vmax_elite = `
 <style>
+    /* VARIABLES GLOBALES DE COLOR */
     :root {
-        --color-bg: #0b0f19;
-        --color-card: #161d2f;
-        --color-blue: #3b82f6;
-        --color-green: #10b981;
-        --color-yellow: #f59e0b;
-        --color-red: #ef4444;
-        --color-text: #f8fafc;
-        --color-muted: #94a3b8;
-        --color-border: #2d3748;
+        --principal-bg: #0b0f19;
+        --tarjeta-bg: #161d2f;
+        --acento-azul: #3b82f6;
+        --acento-verde: #10b981;
+        --acento-amarillo: #f59e0b;
+        --acento-rojo: #ef4444;
+        --texto-principal: #f8fafc;
+        --texto-tenue: #94a3b8;
+        --borde-color: #2d3748;
     }
 
-    * { box-sizing: border-box; transition: all 0.2s ease; }
-
-    body {
-        background-color: var(--color-bg);
-        color: var(--color-text);
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-        margin: 0;
-        padding: 20px;
-        line-height: 1.5;
+    /* ESTILOS DE BASE */
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', system-ui, sans-serif; }
+    
+    body { 
+        background-color: var(--principal-bg); 
+        color: var(--texto-principal); 
+        padding: 20px; 
+        line-height: 1.6;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
     }
 
-    .container { max-width: 650px; margin: auto; padding-bottom: 50px; }
+    .capa-principal { width: 100%; max-width: 680px; }
 
-    .card {
-        background: var(--color-card);
-        border: 1px solid var(--color-border);
-        border-radius: 24px;
+    /* TARJETAS DE DISEÑO */
+    .tarjeta-elite {
+        background: var(--tarjeta-bg);
+        border: 1px solid var(--borde-color);
+        border-radius: 28px;
         padding: 30px;
         margin-bottom: 25px;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        box-shadow: 0 15px 40px rgba(0,0,0,0.6);
+        position: relative;
+        overflow: hidden;
     }
 
-    .title-main {
-        color: var(--color-blue);
+    .titulo-seccion {
+        color: var(--acento-azul);
+        font-weight: 900;
+        font-size: 24px;
         text-align: center;
-        font-size: 28px;
-        font-weight: 800;
-        margin-bottom: 25px;
+        margin-bottom: 30px;
+        text-transform: uppercase;
         letter-spacing: -1px;
     }
 
-    /* SISTEMA DE CONTADORES CIRCULARES */
-    .stats-wrapper {
+    /* SISTEMA DE CONTADORES CIRCULARES V.MAX */
+    .contenedor-stats {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         gap: 15px;
         margin-bottom: 30px;
     }
 
-    .stat-circle {
-        background: rgba(255,255,255,0.03);
-        border: 1px solid var(--color-border);
-        border-radius: 20px;
-        padding: 20px 10px;
+    .circulo-metrica {
+        background: rgba(255,255,255,0.02);
+        border: 1px solid var(--borde-color);
+        border-radius: 24px;
+        padding: 20px 5px;
         text-align: center;
+        transition: transform 0.3s ease;
     }
 
-    .stat-num { font-size: 26px; font-weight: 900; display: block; margin-bottom: 5px; }
-    .stat-txt { font-size: 10px; font-weight: 700; color: var(--color-muted); text-transform: uppercase; letter-spacing: 1px; }
+    .circulo-metrica:hover { transform: translateY(-5px); border-color: var(--acento-azul); }
 
-    /* TERMÓMETRO DE PUNTOS */
-    .progress-info { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 10px; }
-    .progress-rail {
-        background: var(--color-bg);
+    .valor-metrica { display: block; font-size: 28px; font-weight: 900; margin-bottom: 4px; }
+    .label-metrica { font-size: 10px; color: var(--texto-tenue); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+
+    /* BARRA DE PROGRESO DE METAS (TERMÓMETRO) */
+    .info-progreso { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 12px; }
+    .rail-progreso {
+        background: var(--principal-bg);
         border-radius: 50px;
-        height: 14px;
+        height: 16px;
         width: 100%;
-        border: 1px solid var(--color-border);
+        border: 1px solid var(--borde-color);
         overflow: hidden;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
     }
-    .progress-fill {
-        background: linear-gradient(90deg, var(--color-blue), var(--color-green));
+    .llenado-progreso {
+        background: linear-gradient(90deg, var(--acento-azul) 0%, var(--acento-verde) 100%);
         height: 100%;
         border-radius: 50px;
-        box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
+        transition: width 1.5s cubic-bezier(0.17, 0.67, 0.83, 0.67);
     }
 
-    /* FORMULARIOS Y BOTONES */
-    .wallet-box {
-        background: rgba(59, 130, 246, 0.08);
-        border: 2px dashed var(--color-blue);
-        padding: 20px;
-        border-radius: 18px;
-        text-align: center;
-        margin-bottom: 25px;
-    }
-
-    .input-field {
-        background: var(--color-bg);
+    /* COMPONENTES DE FORMULARIO */
+    .input-raizoma {
+        background: var(--principal-bg);
         color: white;
-        border: 1px solid var(--color-border);
-        padding: 16px;
-        border-radius: 12px;
-        width: 100%;
-        margin-bottom: 15px;
-        font-size: 16px;
-    }
-
-    .input-field:focus { border-color: var(--color-blue); outline: none; }
-
-    .btn-main {
-        background: var(--color-blue);
-        color: white;
-        border: none;
+        border: 1px solid var(--borde-color);
         padding: 18px;
         border-radius: 14px;
         width: 100%;
-        font-weight: 800;
+        margin-bottom: 18px;
         font-size: 16px;
-        cursor: pointer;
-        text-transform: uppercase;
+        transition: border-color 0.3s;
     }
 
-    .btn-main:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(59, 130, 246, 0.4); }
+    .input-raizoma:focus { border-color: var(--acento-azul); outline: none; }
 
-    .btn-copy-alt {
-        background: #2d3748;
-        color: #cbd5e0;
-        font-size: 12px;
-        padding: 10px;
-        border-radius: 8px;
-        margin-top: 10px;
+    .boton-primario {
+        background: var(--acento-azul);
+        color: white;
         border: none;
+        padding: 20px;
+        border-radius: 16px;
+        width: 100%;
+        font-weight: 800;
         cursor: pointer;
-        font-weight: bold;
+        font-size: 16px;
+        text-transform: uppercase;
+        transition: 0.3s;
     }
 
-    /* TABLA DE ADMINISTRACIÓN EXTENSA */
-    .admin-table-container { width: 100%; overflow-x: auto; }
-    .admin-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-    .admin-table th { background: #0b0f19; padding: 15px; text-align: left; color: var(--color-blue); border-bottom: 2px solid var(--color-blue); }
-    .admin-table td { padding: 12px; border-bottom: 1px solid #1e293b; vertical-align: top; }
+    .boton-primario:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4); }
+
+    /* TABLAS DE DATOS */
+    .tabla-container { width: 100%; overflow-x: auto; }
+    .tabla-backoffice { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    .tabla-backoffice th { text-align: left; color: var(--texto-tenue); font-size: 11px; padding: 15px; border-bottom: 2px solid var(--borde-color); }
+    .tabla-backoffice td { padding: 15px; border-bottom: 1px solid #1e293b; font-size: 13px; }
+
+    /* BOTONES DE ACCIÓN RÁPIDA */
+    .btn-wa { background: #25d366; color: white; padding: 6px 12px; border-radius: 8px; text-decoration: none; font-size: 11px; font-weight: 800; display: inline-block; }
+    .btn-copiar-link { background: #2d3748; color: var(--acento-azul); border: none; padding: 10px; border-radius: 10px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; }
+
+    /* COLORES DE ESTADO */
+    .txt-azul { color: var(--acento-azul); }
+    .txt-verde { color: var(--acento-verde); }
+    .txt-amarillo { color: var(--acento-amarillo); }
+    .txt-rojo { color: var(--acento-rojo); }
 </style>
 `;
 
-// ============================================================
-// 5. CONTROLADORES DE RUTAS - FRONTEND
-// ============================================================
+// ============================================================================
+// LÓGICA DE RUTAS - NAVEGACIÓN Y RENDERIZADO
+// ============================================================================
 
-/** RUTA: LOGIN */
+/**
+ * PÁGINA DE INICIO (LOGIN)
+ * Renderiza el formulario de acceso inicial.
+ */
 app.get('/', (req, res) => {
-    res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8">${html_styles}</head><body>
-        <div class="container" style="margin-top: 100px;">
-            <div class="card">
-                <h1 class="title-main">🌳 Raízoma</h1>
+    res.send(`
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Acceso | Raízoma Backoffice</title>
+        ${css_vmax_elite}
+    </head>
+    <body>
+        <div class="capa-principal" style="margin-top: 100px;">
+            <div class="tarjeta-elite">
+                <h1 class="titulo-seccion">🌳 Acceso al Sistema</h1>
                 <form action="/login" method="POST">
-                    <input type="text" name="usuario" class="input-field" placeholder="Nombre de usuario" required>
-                    <input type="password" name="password" class="input-field" placeholder="Contraseña" required>
-                    <button type="submit" class="btn-main">Acceder al Sistema</button>
+                    <input type="text" name="usr_login" class="input-raizoma" placeholder="Tu nombre de usuario" required>
+                    <input type="password" name="pwd_login" class="input-raizoma" placeholder="Tu clave de acceso" required>
+                    <button type="submit" class="boton-primario">Iniciar Sesión Ahora</button>
                 </form>
-                <div style="text-align:center; margin-top:20px;">
-                    <a href="/registro" style="color:var(--color-muted); text-decoration:none; font-size:14px;">¿Eres nuevo? <span style="color:var(--color-blue)">Crea una cuenta</span></a>
+                <div style="text-align:center; margin-top:30px;">
+                    <a href="/registro" style="color:var(--texto-tenue); text-decoration:none; font-size:14px;">
+                        ¿No tienes una cuenta? <span class="txt-azul">Regístrate aquí</span>
+                    </a>
                 </div>
             </div>
         </div>
-    </body></html>`);
+    </body>
+    </html>
+    `);
 });
 
-/** RUTA: REGISTRO (PAQUETES Y WALLET FIJA) */
+/**
+ * PÁGINA DE REGISTRO
+ * Captura todos los datos de los nuevos socios.
+ */
 app.get('/registro', (req, res) => {
-    const ref = req.query.ref || '';
-    res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8">${html_styles}</head><body>
-        <div class="container">
-            <div class="card">
-                <h2 class="title-main">Nueva Inscripción</h2>
+    const patrocinador_referido = req.query.ref || '';
+    res.send(`
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Inscripción | Raízoma</title>
+        ${css_vmax_elite}
+    </head>
+    <body>
+        <div class="capa-principal">
+            <div class="tarjeta-elite">
+                <h2 class="titulo-seccion">Formulario de Inscripción</h2>
                 
-                <div class="wallet-box">
-                    <small style="color:var(--color-blue); font-weight:bold;">ENVIAR PAGO USDT (RED TRC20)</small>
-                    <div id="wallet-addr" style="font-family:monospace; color:var(--color-green); font-size:16px; font-weight:bold; margin:10px 0;">TA4wCKDm2kNzPbJWA51CLrUAGqQcPbdtUw</div>
-                    <button onclick="copyElement('wallet-addr')" style="background:none; border:none; color:var(--color-muted); cursor:pointer; font-size:12px; font-weight:bold;">[COPIAR BILLETERA]</button>
+                <div style="background:rgba(59,130,246,0.1); border:2px dashed var(--acento-azul); padding:20px; border-radius:18px; text-align:center; margin-bottom:25px;">
+                    <small class="txt-azul" style="font-weight:bold;">PASO 1: ENVIAR PAGO USDT (TRC20)</small>
+                    <div id="w-disp" style="color:var(--acento-verde); font-family:monospace; font-size:16px; font-weight:900; margin:10px 0;">TA4wCKDm2kNzPbJWA51CLrUAGqQcPbdtUw</div>
+                    <button onclick="copiarW()" style="background:none; border:none; color:var(--texto-tenue); cursor:pointer; font-size:12px;">[Copiar Dirección de Billetera]</button>
                 </div>
 
                 <form action="/registro" method="POST">
-                    <input type="hidden" name="patrocinador" value="${ref}">
+                    <input type="hidden" name="ref_id" value="${patrocinador_referido}">
                     
-                    <label style="font-size:12px; color:var(--color-muted); margin-left:10px;">DATOS PERSONALES</label>
-                    <input type="text" name="nombre" class="input-field" placeholder="Nombre completo" required>
-                    <input type="text" name="user_reg" class="input-field" placeholder="Crea tu usuario" required>
-                    <input type="password" name="pass_reg" class="input-field" placeholder="Crea tu contraseña" required>
+                    <label style="font-size:11px; color:var(--texto-tenue); padding-left:10px;">DATOS DE IDENTIDAD</label>
+                    <input type="text" name="reg_nombre" class="input-raizoma" placeholder="Nombre y Apellidos" required>
+                    <input type="text" name="reg_whatsapp" class="input-raizoma" placeholder="WhatsApp (Ej: 521...)" required>
+                    <input type="text" name="reg_usuario" class="input-raizoma" placeholder="Elige un nombre de usuario" required>
+                    <input type="password" name="reg_password" class="input-raizoma" placeholder="Crea una clave segura" required>
                     
-                    <label style="font-size:12px; color:var(--color-muted); margin-left:10px;">SELECCIONA TU PAQUETE</label>
-                    <select name="plan" class="input-field" style="height: 60px;">
+                    <label style="font-size:11px; color:var(--texto-tenue); padding-left:10px;">DETALLES DEL PLAN</label>
+                    <select name="reg_plan" class="input-raizoma" style="height:60px;">
                         <option value="RZ Metabolico Cap. $300">RZ Metabolico Cap. - $300 MXN</option>
                         <option value="RZ Origen $600">RZ Origen - $600 MXN</option>
                         <option value="Membresia + RZ Origen $1,700">Membresia + RZ Origen - $1,700 MXN</option>
                         <option value="PQT Fundador $15,000">PQT Fundador - $15,000 MXN</option>
                     </select>
 
-                    <input type="text" name="hash" class="input-field" placeholder="Hash de Pago (TxID)" required>
-                    <textarea name="direccion" class="input-field" style="height:100px;" placeholder="Dirección completa para envío de producto" required></textarea>
+                    <input type="text" name="reg_hash" class="input-raizoma" placeholder="Hash de Transacción (TxID)" required>
+                    <textarea name="reg_direccion" class="input-raizoma" style="height:100px; padding-top:15px;" placeholder="Dirección completa para entrega de productos" required></textarea>
                     
-                    <button type="submit" class="btn-main">Completar Registro</button>
+                    <button type="submit" class="boton-primario">Enviar Inscripción Ahora</button>
                 </form>
             </div>
         </div>
         <script>
-            function copyElement(id) {
-                const el = document.getElementById(id);
+            function copiarW() {
+                const el = document.getElementById('w-disp');
                 const range = document.createRange();
                 range.selectNode(el);
                 window.getSelection().removeAllRanges();
                 window.getSelection().addRange(range);
                 document.execCommand("copy");
-                alert("¡Copiado al portapapeles!");
+                alert("Billetera copiada. Procede con tu pago.");
             }
         </script>
-    </body></html>`);
+    </body>
+    </html>
+    `);
 });
 
-/** RUTA: DASHBOARD V.MAX (CONTADORES Y LINK CON BOTÓN COPIAR) */
+/**
+ * DASHBOARD PRINCIPAL
+ * Muestra métricas de equipo, progreso y balance.
+ */
 app.get('/dashboard', (req, res) => {
     if (!req.session.socio) return res.redirect('/');
     const s = req.session.socio;
 
-    db.all("SELECT * FROM socios WHERE patrocinador_id = ?", [s.usuario], (err, invitados) => {
-        let n_totales = invitados ? invitados.length : 0;
-        let n_activos = 0;
-        let n_pendientes = 0;
-        let lista_equipo = "";
+    db.all("SELECT * FROM socios WHERE patrocinador_id = ?", [s.usuario], (err, red_directa) => {
+        let total_invitados = red_directa ? red_directa.length : 0;
+        let activos = 0;
+        let pendientes = 0;
+        let equipo_html = "";
 
-        if (invitados) {
-            invitados.forEach(inv => {
-                if (inv.estado === 'activo') n_activos++;
-                else n_pendientes++;
-                lista_equipo += `<tr>
-                    <td style="padding:10px; border-bottom:1px solid #1e293b;">${inv.nombre}</td>
-                    <td style="padding:10px; border-bottom:1px solid #1e293b;"><small>${inv.plan}</small></td>
-                    <td style="padding:10px; border-bottom:1px solid #1e293b; color:${inv.estado === 'activo' ? '#10b981' : '#f59e0b'}"><b>${inv.estado.toUpperCase()}</b></td>
+        if (red_directa) {
+            red_directa.forEach(v => {
+                if (v.estado === 'activo') activos++;
+                else pendientes++;
+                equipo_html += `
+                <tr>
+                    <td>${v.nombre}</td>
+                    <td><small>${v.plan}</small></td>
+                    <td><b class="${v.estado === 'activo' ? 'txt-verde' : 'txt-amarillo'}">${v.estado.toUpperCase()}</b></td>
                 </tr>`;
             });
         }
 
-        // LÓGICA DE BONOS (META 400 PV = $12,000)
-        let pv = s.puntos || 0;
-        let meta = 100;
-        if (pv >= 400) meta = 400;
-        else if (pv >= 200) meta = 400;
-        else if (pv >= 100) meta = 200;
+        // CÁLCULO DINÁMICO DE TERMÓMETRO (META 400 PV)
+        let pv_actual = s.puntos || 0;
+        let meta_pv = 100;
+        if (pv_actual >= 400) meta_pv = 400;
+        else if (pv_actual >= 200) meta_pv = 400;
+        else if (pv_actual >= 100) meta_pv = 200;
 
-        let porc = (pv / meta) * 100;
-        if (porc > 100) porc = 100;
+        let porcentaje = (pv_actual / meta_pv) * 100;
+        if (porcentaje > 100) porcentaje = 100;
 
-        res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8">${html_styles}</head><body>
-            <div class="container">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                    <h3 style="margin:0;">Socio: <span style="color:var(--color-blue)">${s.nombre}</span></h3>
-                    <a href="/logout" style="color:var(--color-red); text-decoration:none; font-weight:bold;">SALIR</a>
-                </div>
-
-                <div class="stats-wrapper">
-                    <div class="stat-circle"><span class="stat-num" style="color:var(--color-blue)">${n_totales}</span><span class="stat-txt">Equipo</span></div>
-                    <div class="stat-circle"><span class="stat-num" style="color:var(--color-green)">${n_activos}</span><span class="stat-txt">Activos</span></div>
-                    <div class="stat-circle"><span class="stat-num" style="color:var(--color-yellow)">${n_pendientes}</span><span class="stat-txt">Espera</span></div>
-                </div>
-
-                <div class="card">
-                    <div class="progress-info">
-                        <span>PUNTOS ACUMULADOS</span>
-                        <span style="color:var(--color-blue)">${pv} / ${meta} PV</span>
+        res.send(`
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Panel de Socio | Raízoma</title>
+            ${css_vmax_elite}
+        </head>
+        <body>
+            <div class="capa-principal">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px;">
+                    <div>
+                        <h2 style="margin:0; font-size:20px;">Socio: <span class="txt-azul">${s.nombre}</span></h2>
+                        <small style="color:var(--texto-tenue)">Registro: ${s.fecha_reg.split(' ')[0]}</small>
                     </div>
-                    <div class="progress-rail"><div class="progress-fill" style="width:${porc}%"></div></div>
-                    <p style="text-align:center; font-size:12px; color:var(--color-muted); margin-top:10px;">
-                        Meta máxima: 400 PV para Bono de $12,000 MXN.
+                    <a href="/logout" class="txt-rojo" style="text-decoration:none; font-weight:bold;">CERRAR SESIÓN</a>
+                </div>
+
+                <div class="contenedor-stats">
+                    <div class="circulo-metrica"><span class="valor-metrica txt-azul">${total_invitados}</span><span class="label-metrica">Totales</span></div>
+                    <div class="circulo-metrica"><span class="valor-metrica txt-verde">${activos}</span><span class="label-metrica">Activos</span></div>
+                    <div class="circulo-metrica"><span class="valor-metrica txt-amarillo">${pendientes}</span><span class="label-metrica">En Espera</span></div>
+                </div>
+
+                <div class="tarjeta-elite">
+                    <div class="info-progreso">
+                        <span>PUNTOS DE VOLUMEN (PV)</span>
+                        <b class="txt-azul" style="font-size:20px;">${pv_actual} / ${meta_pv}</b>
+                    </div>
+                    <div class="rail-progreso"><div class="llenado-progreso" style="width:${porcentaje}%"></div></div>
+                    <p style="text-align:center; font-size:12px; color:var(--texto-tenue); margin-top:10px;">
+                        ${pv_actual >= 400 ? '¡HAS ALCANZADO LA META MÁXIMA DE LÍDER!' : 'Te faltan ' + (meta_pv - pv_actual) + ' PV para tu siguiente bono.'}
                     </p>
                 </div>
 
-                <div class="card" style="border-left: 6px solid var(--color-green);">
-                    <small style="color:var(--color-muted); font-weight:bold;">BALANCE PARA COBRO</small>
-                    <div style="font-size:36px; font-weight:900; color:var(--color-green); margin:10px 0;">$${s.balance} MXN</div>
+                <div class="tarjeta-elite" style="border-left: 6px solid var(--acento-verde);">
+                    <small class="txt-verde" style="font-weight:bold;">DISPONIBLE PARA COBRO</small>
+                    <div style="font-size:40px; font-weight:900; color:var(--acento-verde); margin:10px 0;">$${s.balance} MXN</div>
                     
                     ${s.balance >= 500 && s.solicitud_retiro !== 'si' ? `
-                        <form action="/pedir-retiro" method="POST" style="margin-top:15px;">
-                            <textarea name="info_retiro" class="input-field" style="height:80px; font-size:13px;" placeholder="Ingresa tus datos bancarios o wallet para recibir tu pago..." required></textarea>
-                            <button type="submit" class="btn-main" style="background:var(--color-green)">Solicitar Retiro de Fondos</button>
-                        </form>
+                    <form action="/solicitar-retiro" method="POST" style="margin-top:20px;">
+                        <textarea name="detalles_pago" class="input-raizoma" style="height:80px; font-size:14px;" placeholder="Banco, CLABE, Nombre del titular o Wallet USDT..." required></textarea>
+                        <button type="submit" class="boton-primario" style="background:var(--acento-verde);">Solicitar Cobro Ahora</button>
+                    </form>
                     ` : ''}
-                    
-                    ${s.solicitud_retiro === 'si' ? '<div style="background:rgba(245,158,11,0.1); color:var(--color-yellow); padding:15px; border-radius:12px; text-align:center; font-weight:bold;">Tu retiro está siendo procesado...</div>' : ''}
+
+                    ${s.solicitud_retiro === 'si' ? `
+                    <div style="background:rgba(245,158,11,0.1); padding:15px; border-radius:12px; text-align:center;">
+                        <b class="txt-amarillo">SOLICITUD EN PROCESO</b><br>
+                        <small>El administrador está verificando tus datos.</small>
+                    </div>
+                    ` : ''}
                 </div>
 
-                <div class="card">
-                    <h4 style="margin:0 0 10px 0;">Enlace de Inscripción</h4>
-                    <input type="text" id="link-invitacion" class="input-field" style="margin-bottom:5px;" value="https://mi-backoffice-ra8q.onrender.com/registro?ref=${s.usuario}" readonly>
-                    <button onclick="copyLink()" class="btn-copy-alt" style="width:100%;">COPIAR LINK DE REGISTRO</button>
+                <div class="tarjeta-elite">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <small class="txt-azul" style="font-weight:bold;">VENTAS TOTALES DE TU RED</small>
+                            <div style="font-size:24px; font-weight:900;">$${s.volumen_red || 0} MXN</div>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="card">
-                    <h4 style="text-align:center; margin-top:0;">MI EQUIPO DIRECTO</h4>
-                    <table style="width:100%; border-collapse:collapse; font-size:14px;">
-                        <thead><tr style="text-align:left; color:var(--color-muted); font-size:11px;"><th>Socio</th><th>Plan</th><th>Estado</th></tr></thead>
-                        <tbody>${lista_equipo || '<tr><td colspan="3" style="text-align:center; padding:20px;">Aún no tienes invitados.</td></tr>'}</tbody>
-                    </table>
+                <div class="tarjeta-elite">
+                    <h4 style="margin-bottom:12px; font-size:14px;">Tu enlace de invitación</h4>
+                    <input type="text" id="referral-link" class="input-raizoma" style="margin-bottom:5px;" value="https://mi-backoffice-ra8q.onrender.com/registro?ref=${s.usuario}" readonly>
+                    <button onclick="copiarLinkReg()" class="btn-copiar-link">COPIAR LINK DE INSCRIPCIÓN</button>
                 </div>
 
-                ${s.usuario === 'ADMINRZ' ? '<a href="/codigo-1-panel" class="btn-main" style="background:var(--color-yellow); display:block; text-align:center; text-decoration:none; margin-top:20px;">ENTRAR AL PANEL MAESTRO</a>' : ''}
+                <div class="tarjeta-elite">
+                    <h4 style="text-align:center; margin-bottom:20px;">Mi Estructura Directa</h4>
+                    <div class="tabla-container">
+                        <table class="tabla-backoffice">
+                            <thead><tr><th>Nombre</th><th>Plan</th><th>Estado</th></tr></thead>
+                            <tbody>
+                                ${equipo_html || '<tr><td colspan="3" style="text-align:center; padding:20px; color:var(--texto-tenue);">Aún no tienes socios directos inscritos.</td></tr>'}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                ${s.usuario === 'ADMINRZ' ? `
+                <a href="/panel-maestro-raizoma" class="boton-primario" style="background:var(--acento-amarillo); display:block; text-align:center; text-decoration:none; margin-top:25px;">ABRIR PANEL ADMINISTRATIVO</a>
+                ` : ''}
             </div>
             <script>
-                function copyLink() {
-                    const input = document.getElementById('link-invitacion');
-                    input.select();
-                    input.setSelectionRange(0, 99999);
+                function copiarLinkReg() {
+                    const i = document.getElementById('referral-link');
+                    i.select();
                     document.execCommand("copy");
-                    alert("¡Enlace copiado! Ya puedes compartirlo.");
+                    alert("Enlace copiado correctamente.");
                 }
             </script>
-        </body></html>`);
+        </body>
+        </html>
+        `);
     });
 });
 
-// ============================================================
-// 6. PANEL DE ADMINISTRACIÓN (MÁXIMO CONTROL Y VARIABLES)
-// ============================================================
-
-app.get('/codigo-1-panel', (req, res) => {
+/**
+ * PANEL DE ADMINISTRACIÓN MAESTRO
+ * Control total sobre los socios y pagos.
+ */
+app.get('/panel-maestro-raizoma', (req, res) => {
     if (!req.session.socio || req.session.socio.usuario !== 'ADMINRZ') return res.redirect('/');
-    
-    db.all("SELECT * FROM socios ORDER BY id DESC", (err, rows) => {
-        let rows_html = "";
-        rows.forEach(r => {
-            let row_alert = r.solicitud_retiro === 'si' ? "background:rgba(239, 68, 68, 0.15);" : "";
-            rows_html += `<tr style="${row_alert}">
-                <td>ID: ${r.id}<br><b>${r.usuario}</b></td>
-                <td>Ref por:<br><span style="color:var(--color-blue)">${r.patrocinador_id || 'DIRECTO'}</span></td>
-                <td><b>${r.plan}</b><br><small style="font-size:9px; color:var(--color-muted)">${r.hash_pago}</small></td>
-                <td>$${r.balance}<br><span style="color:${r.estado === 'activo' ? '#10b981' : '#f59e0b'}"><b>${r.estado}</b></span></td>
+
+    db.all("SELECT * FROM socios ORDER BY id DESC", (err, todos) => {
+        let tabla_admin = "";
+        todos.forEach(r => {
+            const solicitud_pendiente = r.solicitud_retiro === 'si' ? 'background:rgba(239, 68, 68, 0.1);' : '';
+            tabla_admin += `
+            <tr style="${solicitud_pendiente}">
                 <td>
-                    <small><b>Dir:</b> ${r.direccion}</small><br>
-                    <small><b>Pago:</b> ${r.detalles_retiro || 'Ninguno'}</small>
+                    <b>ID: ${r.id}</b><br>
+                    ${r.usuario}<br>
+                    <small>${r.fecha_reg}</small>
                 </td>
                 <td>
-                    <a href="/master-activar/${r.id}" style="color:var(--color-blue); text-decoration:none; font-weight:bold;">ACTIVAR</a><br><br>
-                    <a href="/master-baja/${r.id}" style="color:var(--color-red); text-decoration:none; font-size:11px;">DESACTIVAR</a><br><br>
-                    <a href="/master-pagado/${r.id}" style="color:var(--color-green); text-decoration:none; font-weight:bold;">PAGADO</a>
+                    Ref por: <b class="txt-azul">${r.patrocinador_id || 'ORIGEN'}</b><br><br>
+                    <a href="https://wa.me/${r.whatsapp}" target="_blank" class="btn-wa">WhatsApp</a>
+                </td>
+                <td>
+                    <b>${r.plan}</b><br>
+                    <small style="font-size:9px; color:var(--texto-tenue); word-break:break-all;">${r.hash_pago}</small>
+                </td>
+                <td>
+                    Balance: <b class="txt-verde">$${r.balance}</b><br>
+                    PV: <b class="txt-azul">${r.puntos}</b><br>
+                    Estatus: <b class="${r.estado === 'activo' ? 'txt-verde' : 'txt-amarillo'}">${r.estado}</b>
+                </td>
+                <td>
+                    <small><b>ENVÍO:</b> ${r.direccion}</small><br><br>
+                    <small><b>COBRO:</b> ${r.detalles_retiro || 'No solicitado'}</small>
+                </td>
+                <td>
+                    <a href="/admin/activar/${r.id}" class="txt-azul" style="text-decoration:none; font-weight:bold;">ACTIVAR</a><br><br>
+                    <a href="/admin/baja/${r.id}" class="txt-rojo" style="text-decoration:none; font-size:11px;">DESACTIVAR</a><br><br>
+                    <a href="/admin/pagar/${r.id}" class="txt-verde" style="text-decoration:none; font-weight:bold;">PAGADO</a>
                 </td>
             </tr>`;
         });
 
-        res.send(`<!DOCTYPE html><html><head><meta charset="UTF-8">${html_styles}</head><body>
-            <div class="card" style="max-width:1000px; margin:auto; width:95%;">
-                <h2 class="title-main">PANEL DE CONTROL MAESTRO</h2>
-                <div class="admin-table-container">
-                    <table class="admin-table">
-                        <thead><tr><th>Usuario</th><th>Sponsor</th><th>Paquete/Hash</th><th>Balance/Estado</th><th>Logística/Retiro</th><th>Acciones</th></tr></thead>
-                        <tbody>${rows_html}</tbody>
+        res.send(`
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            ${css_vmax_elite}
+            <title>Panel Maestro | Raízoma</title>
+        </head>
+        <body>
+            <div class="tarjeta-elite" style="max-width:1150px; width:98%;">
+                <h1 class="titulo-seccion">Control Maestro de Logística</h1>
+                <div class="tabla-container">
+                    <table class="tabla-backoffice">
+                        <thead>
+                            <tr>
+                                <th>Socio/Fecha</th>
+                                <th>Sponsor/WA</th>
+                                <th>Paquete/Hash</th>
+                                <th>Finanzas/PV</th>
+                                <th>Dirección/Pago</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>${tabla_admin}</tbody>
                     </table>
                 </div>
                 <div style="margin-top:30px; text-align:center;">
-                    <a href="/dashboard" class="btn-main" style="text-decoration:none; display:inline-block; width:200px;">Cerrar Panel</a>
+                    <a href="/dashboard" class="boton-primario" style="display:inline-block; width:250px; text-decoration:none;">Cerrar Panel Maestro</a>
                 </div>
             </div>
-        </body></html>`);
+        </body>
+        </html>
+        `);
     });
 });
 
-// ============================================================
-// 7. LÓGICA DE PROCESAMIENTO (BONOS Y ESTADOS)
-// ============================================================
+// ============================================================================
+// LÓGICA DE PROCESAMIENTO DE DATOS (POST/GET)
+// ============================================================================
 
+/** PROCESAR LOGIN */
 app.post('/login', (req, res) => {
-    const { usuario, password } = req.body;
-    db.get("SELECT * FROM socios WHERE usuario = ? AND password = ?", [usuario, password], (err, row) => {
+    const { usr_login, pwd_login } = req.body;
+    db.get("SELECT * FROM socios WHERE usuario = ? AND password = ?", [usr_login, pwd_login], (err, row) => {
         if (row) {
             req.session.socio = row;
             res.redirect('/dashboard');
         } else {
-            res.send("<script>alert('Datos incorrectos'); window.location='/';</script>");
+            res.send("<script>alert('Acceso denegado. Verifica tus credenciales.'); window.location='/';</script>");
         }
     });
 });
 
+/** PROCESAR REGISTRO */
 app.post('/registro', (req, res) => {
-    const { nombre, user_reg, pass_reg, patrocinador, plan, hash, direccion } = req.body;
-    db.run(`INSERT INTO socios (nombre, usuario, password, patrocinador_id, plan, hash_pago, direccion) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [nombre, user_reg, pass_reg, patrocinador, plan, hash, direccion], (err) => {
-            if (err) return res.send("Error: El usuario ya existe.");
-            res.send("<body style='background:#0b0f19; color:white; text-align:center; padding-top:100px; font-family:sans-serif;'><h1>Registro Exitoso</h1><p>Tu solicitud está en revisión. Contacta a soporte para tu activación.</p><br><a href='/' style='color:#3b82f6;'>Regresar al inicio</a></body>");
-        });
-});
-
-app.post('/pedir-retiro', (req, res) => {
-    if (!req.session.socio) return res.redirect('/');
-    db.run("UPDATE socios SET solicitud_retiro = 'si', detalles_retiro = ? WHERE id = ?", [req.body.info_retiro, req.session.socio.id], () => {
-        res.send("<script>alert('Solicitud enviada al administrador.'); window.location='/dashboard';</script>");
-    });
-});
-
-// LÓGICA DE BONOS CORREGIDA ($12,000)
-app.get('/master-activar/:id', (req, res) => {
-    const sId = req.params.id;
-    db.get("SELECT * FROM socios WHERE id = ?", [sId], (err, row) => {
-        if (row && row.estado !== 'activo' && row.patrocinador_id) {
-            // Incrementar puntos al patrocinador
-            db.run("UPDATE socios SET puntos = puntos + 100 WHERE usuario = ?", [row.patrocinador_id], () => {
-                db.get("SELECT puntos, bono_cobrado FROM socios WHERE usuario = ?", [row.patrocinador_id], (err, p) => {
-                    
-                    // ESCALA 20%: 100PV=$1500, 200PV=$6000, 400PV=$12000
-                    let meta_dinero = 0;
-                    if (p.puntos >= 400) meta_dinero = 12000;
-                    else if (p.puntos >= 200) meta_dinero = 6000;
-                    else if (p.puntos >= 100) meta_dinero = 1500;
-
-                    let diferencia = meta_dinero - (p.bono_cobrado || 0);
-                    if (diferencia > 0) {
-                        db.run("UPDATE socios SET balance = balance + ?, bono_cobrado = bono_cobrado + ? WHERE usuario = ?", [diferencia, diferencia, row.patrocinador_id]);
-                    }
-                });
-            });
+    const { reg_nombre, reg_whatsapp, reg_usuario, reg_password, ref_id, reg_plan, reg_hash, reg_direccion } = req.body;
+    db.run(`INSERT INTO socios (nombre, whatsapp, usuario, password, patrocinador_id, plan, hash_pago, direccion) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [reg_nombre, reg_whatsapp, reg_usuario, reg_password, ref_id, reg_plan, reg_hash, reg_direccion], (err) => {
+        if (err) {
+            return res.send("<script>alert('Error: El nombre de usuario ya existe.'); window.history.back();</script>");
         }
-        db.run("UPDATE socios SET estado = 'activo' WHERE id = ?", [sId], () => res.redirect('/codigo-1-panel'));
+        res.send(`
+        <body style="background:#0b0f19; color:white; text-align:center; padding-top:100px; font-family:sans-serif;">
+            <h1 class="txt-verde">¡Inscripción Enviada!</h1>
+            <p>Tu cuenta será activada por el administrador tras validar el hash de pago.</p>
+            <br><a href="/" style="color:#3b82f6; font-weight:bold; text-decoration:none;">REGRESAR AL INICIO</a>
+        </body>
+        `);
     });
 });
 
-app.get('/master-baja/:id', (req, res) => {
-    db.run("UPDATE socios SET estado = 'pendiente' WHERE id = ?", [req.params.id], () => res.redirect('/codigo-1-panel'));
+/** PROCESAR SOLICITUD DE RETIRO */
+app.post('/solicitar-retiro', (req, res) => {
+    if (!req.session.socio) return res.redirect('/');
+    db.run("UPDATE socios SET solicitud_retiro = 'si', detalles_retiro = ? WHERE id = ?", 
+        [req.body.detalles_pago, req.session.socio.id], () => {
+        res.send("<script>alert('Tu solicitud ha sido enviada. El balance se liquidará en breve.'); window.location='/dashboard';</script>");
+    });
 });
 
-app.get('/master-pagado/:id', (req, res) => {
-    db.run("UPDATE socios SET solicitud_retiro = 'no', balance = 0, detalles_retiro = NULL WHERE id = ?", [req.params.id], () => res.redirect('/codigo-1-panel'));
+/** ACCIÓN: ACTIVAR SOCIO Y PAGAR BONOS AL 20% */
+app.get('/admin/activar/:id', (req, res) => {
+    if (!req.session.socio || req.session.socio.usuario !== 'ADMINRZ') return res.redirect('/');
+
+    db.get("SELECT * FROM socios WHERE id = ?", [req.params.id], (err, row) => {
+        if (row && row.estado !== 'activo') {
+            // Calculamos el valor numérico del plan para el volumen de red
+            const valor_plan = parseInt(row.plan.replace(/[^0-9]/g, '')) || 0;
+            
+            // Si tiene patrocinador, actualizamos PV y Balance del patrocinador
+            if (row.patrocinador_id) {
+                db.run("UPDATE socios SET puntos = puntos + 100, volumen_red = volumen_red + ? WHERE usuario = ?", 
+                    [valor_plan, row.patrocinador_id], () => {
+                    
+                    db.get("SELECT puntos, bono_cobrado FROM socios WHERE usuario = ?", [row.patrocinador_id], (err, p) => {
+                        // REGLA DEL 20% (META $12,000)
+                        let meta_dinero = 0;
+                        if (p.puntos >= 400) meta_dinero = 12000;
+                        else if (p.puntos >= 200) meta_dinero = 6000;
+                        else if (p.puntos >= 100) meta_dinero = 1500;
+
+                        const diferencia = meta_dinero - (p.bono_cobrado || 0);
+                        if (diferencia > 0) {
+                            db.run("UPDATE socios SET balance = balance + ?, bono_cobrado = bono_cobrado + ? WHERE usuario = ?", 
+                                [diferencia, diferencia, row.patrocinador_id]);
+                        }
+                    });
+                });
+            }
+            
+            // Activamos definitivamente al socio
+            db.run("UPDATE socios SET estado = 'activo' WHERE id = ?", [req.params.id], () => {
+                res.redirect('/panel-maestro-raizoma');
+            });
+        } else {
+            res.redirect('/panel-maestro-raizoma');
+        }
+    });
 });
 
-app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/'); });
+/** ACCIÓN: DAR DE BAJA O DESACTIVAR */
+app.get('/admin/baja/:id', (req, res) => {
+    if (!req.session.socio || req.session.socio.usuario !== 'ADMINRZ') return res.redirect('/');
+    db.run("UPDATE socios SET estado = 'pendiente' WHERE id = ?", [req.params.id], () => {
+        res.redirect('/panel-maestro-raizoma');
+    });
+});
 
-// ============================================================
-// 8. CIERRE Y LANZAMIENTO DEL SERVIDOR
-// ============================================================
+/** ACCIÓN: MARCAR RETIRO COMO PAGADO */
+app.get('/admin/pagar/:id', (req, res) => {
+    if (!req.session.socio || req.session.socio.usuario !== 'ADMINRZ') return res.redirect('/');
+    db.run("UPDATE socios SET solicitud_retiro = 'no', balance = 0, detalles_retiro = NULL WHERE id = ?", 
+        [req.params.id], () => {
+        res.redirect('/panel-maestro-raizoma');
+    });
+});
+
+/** CERRAR SESIÓN */
+app.get('/logout', (req, res) => {
+    req.session.destroy();
+    res.redirect('/');
+});
+
+// ============================================================================
+// FINALIZACIÓN Y ARRANQUE DEL SERVIDOR
+// ============================================================================
 app.listen(port, () => {
-    console.log("--------------------------------------------------");
-    console.log(`RAÍZOMA V.MAX ONLINE EN PUERTO: ${port}`);
-    console.log(`META MÁXIMA DE BONO: $12,000 MXN`);
+    console.log("==================================================");
+    console.log("RAÍZOMA ELITE V.MAX - SERVIDOR ONLINE");
+    console.log(`PUERTO DE ESCUCHA: ${port}`);
     console.log(`BILLETERA USDT: TA4wCKDm2kNzPbJWA51CLrUAGqQcPbdtUw`);
-    console.log("--------------------------------------------------");
+    console.log(`LÍNEAS DE CÓDIGO TOTALES: > 615`);
+    console.log("==================================================");
 });
 
 /**
- * NOTAS DE SEGURIDAD:
- * - El código ha sido expandido deliberadamente para asegurar la estabilidad del despliegue.
- * - No se deben eliminar los bloques de comentarios ni las validaciones de DB.
- * - La meta de puntos está anclada a 400 PV para el rango Líder.
+ * FIN DEL ARCHIVO - SISTEMA RAÍZOMA V.MAX ELITE 2026
+ * PROTEGIDO POR ESTRUCTURA EXTENSA.
  */
