@@ -80,13 +80,12 @@ app.get('/dashboard', (req, res) => {
                     <h3>Hola, ${s.nombre}</h3>
                     <a href="/logout" style="color:#ef4444; text-decoration:none; font-size:12px;">Salir</a>
                 </div>
-
                 <div style="background:#1e293b; padding:15px; border-radius:15px; margin-bottom:20px; border:1px solid #3b82f6;">
-                    <small style="color:#94a3b8;">Tu Enlace de Invitación:</small>
-                    <div style="display:flex; gap:10px; margin-top:5px;">
-                        <input value="${refLink}" id="refLink" readonly style="flex:1; background:#0b0e11; border:1px solid #334155; color:#3b82f6; padding:8px; border-radius:8px; font-size:11px;">
-                        <button onclick="copyLink()" style="background:#3b82f6; color:white; border:none; border-radius:8px; padding:0 15px; cursor:pointer; font-size:11px;">Copiar</button>
+                    <small style="color:#94a3b8;">Puntos de Volumen (PV)</small>
+                    <div style="font-size:24px; font-weight:bold; color:#10b981; margin-top:5px;">
+                         ${user.puntos || 0} PV
                     </div>
+                    <small style="color:#64748b;">Acumulado total de tu red activa</small>
                 </div>
 
                 <div style="background:linear-gradient(135deg, #1e293b, #0f172a); padding:30px; border-radius:24px; border:1px solid #334155; margin-bottom:20px;">
@@ -175,7 +174,8 @@ app.get('/codigo-1-panel', (req, res) => {
 
 app.get('/activar/:id', (req, res) => {
     if (!req.session.admin) return res.send('No');
-    db.run("UPDATE socios SET estado = 'aprobado' WHERE id = ?", [req.params.id], () => res.redirect('/codigo-1-panel'));
+    db.run(`UPDATE users SET status = 'activo', puntos = puntos + 100 WHERE id = ?`, [userId], (err) => {
+    if (err) console.error("Error al sumar puntos");
 });
 
 app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/'); });
