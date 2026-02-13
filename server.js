@@ -4,77 +4,104 @@ const app = express();
 
 app.use(express.urlencoded({ extended: true }));
 
-// Base de datos en memoria (Garantiza que Render no dé errores de escritura)
+// Base de datos - Versión estable
 const db = new sqlite3.Database(':memory:');
-
 db.serialize(() => {
-    db.run("CREATE TABLE socios (nombre TEXT, direccion TEXT, volumen REAL)");
+    db.run("CREATE TABLE socios (nombre TEXT, direccion TEXT, volumen REAL, fecha TEXT)");
 });
 
-// LÓGICA DE BONOS RAIZOMA (Basada en tu Plan de Negocios)
 function calcularBono(v) {
-    if (v >= 60000) return { p: v * 0.20, r: "Senior Managing Partner (20%)" };
-    if (v >= 30000) return { p: 4500, r: "Director Partner (Fijo $4,500)" };
-    if (v >= 15000) return { p: 1500, r: "Asociado Partner (Fijo $1,500)" };
-    return { p: 0, r: "Socio Activo" };
+    if (v >= 60000) return { p: v * 0.20, r: "Senior Partner", c: "#c084fc" };
+    if (v >= 30000) return { p: 4500, r: "Director", c: "#60a5fa" };
+    if (v >= 15000) return { p: 1500, r: "Asociado", c: "#34d399" };
+    return { p: 0, r: "Socio", c: "#94a3b8" };
 }
 
-// VISTA: CUENTA MADRE
 app.get('/', (req, res) => {
     db.all("SELECT * FROM socios", (err, rows) => {
-        const listado = rows.map(s => {
-            const b = calcularBono(s.volumen);
-            return `
-            <tr>
-                <td style="padding:15px; border-bottom:1px solid #eee;">
-                    <b>${s.nombre}</b><br><small style="color:#666;">📍 ${s.direccion}</small>
-                </td>
-                <td style="padding:15px; border-bottom:1px solid #eee;">$${s.volumen.toLocaleString()}</td>
-                <td style="padding:15px; border-bottom:1px solid #eee; color:#10b981;">
-                    <b>$${b.p.toLocaleString()}</b><br><small style="color:#1a237e;">${b.r}</small>
-                </td>
-            </tr>`;
-        }).join('');
-
+        const totalVol = rows.reduce((acc, curr) => acc + curr.volumen, 0);
+        const totalBonos = rows.reduce((acc, curr) => acc + calcularBono(curr.volumen).p, 0);
+        
         res.send(`
-        <body style="font-family:sans-serif; background:#f4f7f6; padding:40px;">
-            <div style="max-width:900px; margin:auto; background:white; padding:40px; border-radius:20px; box-shadow:0 10px 25px rgba(0,0,0,0.05);">
-                <h1 style="color:#1a237e; margin:0;">Raízoma: Backoffice</h1>
-                <p style="color:#64748b;">Gestión de Red y Bonos de Gestión</p>
-                <a href="/unete" style="background:#2ecc71; color:white; padding:12px 25px; border-radius:10px; text-decoration:none; float:right; font-weight:bold;">+ REGISTRAR SOCIO</a>
-                <br><br><table style="width:100%; border-collapse:collapse; margin-top:30px;">
-                    <tr style="text-align:left; background:#f8fafc; color:#64748b;">
-                        <th style="padding:10px;">SOCIO / LOGÍSTICA</th>
-                        <th>VOLUMEN</th>
-                        <th>BONO ASIGNADO</th>
-                    </tr>
-                    ${listado || '<tr><td colspan="3" style="text-align:center; padding:40px; color:#94a3b8;">No hay socios registrados.</td></tr>'}
-                </table>
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Raízoma | Dashboard</title>
+            <style>
+                :root { --bg: #0b0e11; --card: #181a20; --accent: #2ecc71; --text: #eaecef; }
+                body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+                .container { max-width: 1000px; margin: auto; }
+                .top-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+                .stat-card { background: var(--card); padding: 20px; border-radius: 15px; border-bottom: 3px solid var(--accent); text-align: center; }
+                .stat-card h3 { color: #848e9c; font-size: 14px; margin: 0; }
+                .stat-card p { font-size: 24px; font-weight: bold; margin: 10px 0 0; }
+                .main-table { background: var(--card); border-radius: 20px; padding: 25px; overflow-x: auto; }
+                table { width: 100%; border-collapse: collapse; }
+                th { text-align: left; color: #848e9c; padding: 15px; font-size: 12px; text-transform: uppercase; }
+                td { padding: 15px; border-top: 1px solid #2b2f36; }
+                .rango-tag { padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; }
+                .btn { background: var(--accent); color: #000; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: bold; float: right; margin-bottom: 20px; transition: 0.3s; }
+                .btn:hover { opacity: 0.8; }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <a href="/unete" class="btn">+ REGISTRO</a>
+                <h1 style="font-size: 28px;">Raízoma <span style="color:var(--accent)">Global</span></h1>
+                
+                <div class="top-stats">
+                    <div class="stat-card"><h3>VOLUMEN TOTAL</h3><p>$${totalVol.toLocaleString()}</p></div>
+                    <div class="stat-card"><h3>GESTIÓN RED</h3><p>$${totalBonos.toLocaleString()}</p></div>
+                    <div class="stat-card"><h3>SOCIOS ACTIVOS</h3><p>${rows.length}</p></div>
+                </div>
+
+                <div class="main-table">
+                    <table>
+                        <thead>
+                            <tr><th>Socio / Logística</th><th>Volumen</th><th>Rango</th><th>Gestión</th></tr>
+                        </thead>
+                        <tbody>
+                            ${rows.map(s => {
+                                const b = calcularBono(s.volumen);
+                                return `
+                                <tr>
+                                    <td><b>${s.nombre}</b><br><small style="color:#848e9c">${s.direccion}</small></td>
+                                    <td>$${s.volumen.toLocaleString()}</td>
+                                    <td><span class="rango-tag" style="background:${b.c}33; color:${b.c}">${b.r}</span></td>
+                                    <td style="color:${b.p > 0 ? '#2ecc71' : '#848e9c'}"><b>$${b.p.toLocaleString()}</b></td>
+                                </tr>`;
+                            }).join('') || '<tr><td colspan="4" style="text-align:center; padding:40px;">Esperando datos del mercado...</td></tr>'}
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        </body>`);
+        </body>
+        </html>
+        `);
     });
 });
 
-// VISTA: REGISTRO DE SOCIOS
 app.get('/unete', (req, res) => {
     res.send(`
-    <body style="background:#1a237e; font-family:sans-serif; display:flex; justify-content:center; align-items:center; height:100vh; margin:0;">
-        <form action="/reg" method="POST" style="background:white; padding:40px; border-radius:20px; width:350px;">
-            <h2 style="color:#1a237e; margin-bottom:25px; text-align:center;">Alta de Socio</h2>
-            <input name="n" placeholder="Nombre completo" style="width:100%; margin-bottom:15px; padding:12px; border:1px solid #ddd; border-radius:8px;" required>
-            <textarea name="d" placeholder="Dirección de envío completa" style="width:100%; margin-bottom:15px; padding:12px; border:1px solid #ddd; border-radius:8px;" required></textarea>
-            <div style="background:#e8f5e9; padding:15px; border-radius:10px; font-size:12px; margin-bottom:15px; border:1px dashed #2ecc71;">
-                <b>PAGO USDT (TRC20):</b><br>TA4wCKDm2kNzPbJWA51CLrUAGqQcPbdtUw
+    <body style="background:#0b0e11; font-family:sans-serif; color:white; display:flex; justify-content:center; align-items:center; height:100vh; margin:0;">
+        <form action="/reg" method="POST" style="background:#181a20; padding:40px; border-radius:20px; width:350px; border:1px solid #2b2f36;">
+            <h2 style="text-align:center; margin-top:0;">Alta Raízoma</h2>
+            <input name="n" placeholder="Nombre" style="width:100%; margin-bottom:15px; padding:12px; background:#2b2f36; border:none; border-radius:8px; color:white;" required>
+            <textarea name="d" placeholder="Dirección Envío" style="width:100%; margin-bottom:15px; padding:12px; background:#2b2f36; border:none; border-radius:8px; color:white;" required></textarea>
+            <div style="background:#1e2329; padding:15px; border-radius:10px; font-size:11px; margin-bottom:15px; color:#2ecc71; border:1px solid #2ecc71;">
+                <b>USDT TRC20:</b><br>TA4wCKDm2kNzPbJWA51CLrUAGqQcPbdtUw
             </div>
-            <input name="v" type="number" placeholder="Monto enviado ($)" style="width:100%; margin-bottom:20px; padding:12px; border:1px solid #ddd; border-radius:8px;" required>
-            <button type="submit" style="width:100%; padding:15px; background:#2ecc71; color:white; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">ACTIVAR SOCIO</button>
+            <input name="v" type="number" placeholder="Monto ($)" style="width:100%; margin-bottom:20px; padding:12px; background:#2b2f36; border:none; border-radius:8px; color:white;" required>
+            <button type="submit" style="width:100%; padding:15px; background:#2ecc71; color:black; border:none; border-radius:10px; font-weight:bold; cursor:pointer;">CONFIRMAR ACTIVACIÓN</button>
         </form>
     </body>`);
 });
 
 app.post('/reg', (req, res) => {
-    db.run("INSERT INTO socios VALUES (?,?,?)", [req.body.n, req.body.d, req.body.v], () => res.redirect('/'));
+    db.run("INSERT INTO socios VALUES (?,?,?,?)", [req.body.n, req.body.d, req.body.v, new Date().toLocaleDateString()], () => res.redirect('/'));
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log('Raizoma Live on Port ' + PORT));
+app.listen(PORT, () => console.log('Dashboard Raízoma OK'));
