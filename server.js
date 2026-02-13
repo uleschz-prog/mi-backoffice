@@ -13,12 +13,14 @@ const port = process.env.PORT || 10000;
 const dbPath = path.join('/data', 'raizoma.db');
 const db = new sqlite3.Database(dbPath, (err) => {
     if (err) {
+        console.error("*****************************************");
         console.error("ERROR CRÍTICO AL ABRIR LA BASE DE DATOS:");
         console.error(err.message);
+        console.error("*****************************************");
     } else {
         console.log("-----------------------------------------");
         console.log("CONEXIÓN EXITOSA: /data/raizoma.db");
-        console.log("SISTEMA RAÍZOMA V.MAX ACTUALIZADO");
+        console.log("SISTEMA RAÍZOMA V.MAX DEFINITIVO 2026");
         console.log("-----------------------------------------");
     }
 });
@@ -44,289 +46,399 @@ db.serialize(() => {
         detalles_retiro TEXT
     )`);
 
-    // Asegurar que las columnas existan
+    // Asegurar que las columnas existan (Actualización forzada)
     db.run("ALTER TABLE socios ADD COLUMN balance REAL DEFAULT 0", (err) => {});
     db.run("ALTER TABLE socios ADD COLUMN puntos INTEGER DEFAULT 0", (err) => {});
     db.run("ALTER TABLE socios ADD COLUMN bono_cobrado REAL DEFAULT 0", (err) => {});
     db.run("ALTER TABLE socios ADD COLUMN solicitud_retiro TEXT DEFAULT 'no'", (err) => {});
     db.run("ALTER TABLE socios ADD COLUMN detalles_retiro TEXT", (err) => {});
 
-    // --- GENERACIÓN DEL ADMINRZ ---
+    // --- GENERACIÓN DEL ADMIN MAESTRO ---
     const masterUser = 'ADMINRZ';
     const masterPass = 'ROOT'; 
     db.get("SELECT * FROM socios WHERE usuario = ?", [masterUser], (err, row) => {
         if (!row) {
             db.run(`INSERT INTO socios (nombre, usuario, password, estado, plan, balance, puntos) 
                     VALUES (?, ?, ?, ?, ?, ?, ?)`, 
-                    ['Administrador General', masterUser, masterPass, 'activo', 'MASTER', 0, 0]);
+                    ['Administrador Maestro', masterUser, masterPass, 'activo', 'MASTER', 0, 0]);
         }
     });
 });
 
 // ============================================================
-// 3. MIDDLEWARES Y SEGURIDAD
+// 3. MIDDLEWARES Y SEGURIDAD DE SESIÓN
 // ============================================================
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(session({
-    secret: 'raizoma_ultra_secure_encryption_2026',
+    secret: 'raizoma_super_secret_encryption_key_vmax_2026',
     resave: false,
-    saveUninitialized: true
+    saveUninitialized: true,
+    cookie: { maxAge: 24 * 60 * 60 * 1000 } // 24 horas
 }));
 
 // ============================================================
-// 4. DISEÑO CSS PERSONALIZADO (EXTENSO)
+// 4. DISEÑO CSS PROFESIONAL (EXTENSO Y SIN RECORTES)
 // ============================================================
 const html_styles = `
     <style>
+        :root {
+            --bg-deep: #0b0f19;
+            --bg-card: #161d2f;
+            --bg-input: #0b0f19;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-yellow: #f59e0b;
+            --accent-red: #ef4444;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
         body {
-            background-color: #0f172a;
-            color: #f8fafc;
-            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background-color: var(--bg-deep);
+            color: var(--text-main);
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
             margin: 0;
             padding: 20px;
+            display: flex;
+            justify-content: center;
+            line-height: 1.6;
         }
-        .contenedor {
-            max-width: 600px;
-            margin: 0 auto;
+
+        .contenedor-principal {
+            width: 100%;
+            max-width: 550px;
         }
-        .tarjeta-raizoma {
-            background-color: #1e293b;
-            border: 1px solid #334155;
-            border-radius: 20px;
-            padding: 30px;
+
+        .tarjeta {
+            background: var(--bg-card);
+            border: 1px solid #2d3748;
+            border-radius: 24px;
+            padding: 28px;
             margin-bottom: 25px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+            transition: transform 0.3s ease;
         }
-        .titulo-principal {
-            color: #3b82f6;
-            text-align: center;
+
+        .titulo-seccion {
+            color: var(--accent-blue);
             font-weight: 800;
-        }
-        .wallet-box {
-            background-color: #0f172a;
-            border: 2px dashed #3b82f6;
-            padding: 15px;
-            border-radius: 12px;
+            font-size: 22px;
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
+            letter-spacing: -0.5px;
         }
-        .wallet-address {
-            color: #10b981;
-            font-family: monospace;
-            font-size: 16px;
-            word-break: break-all;
+
+        /* DISEÑO DE CÍRCULOS DE EQUIPO */
+        .grid-equipo {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .circulo-stats {
+            text-align: center;
+            background: rgba(255,255,255,0.03);
+            padding: 15px 5px;
+            border-radius: 20px;
+            border: 1px solid #2d3748;
+        }
+
+        .stat-numero {
+            display: block;
+            font-size: 24px;
+            font-weight: 900;
+            margin-bottom: 4px;
+        }
+
+        .stat-nombre {
+            font-size: 10px;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+        }
+
+        /* COLORES DINÁMICOS */
+        .color-blue { color: var(--accent-blue); }
+        .color-green { color: var(--accent-green); }
+        .color-yellow { color: var(--accent-yellow); }
+
+        /* TERMÓMETRO DE PUNTOS */
+        .meta-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
             font-weight: bold;
+            margin-bottom: 12px;
         }
-        .input-form {
-            background-color: #0f172a;
+
+        .progreso-container {
+            background: var(--bg-deep);
+            border-radius: 50px;
+            height: 16px;
+            width: 100%;
+            border: 1px solid #2d3748;
+            overflow: hidden;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .progreso-fill {
+            background: linear-gradient(90deg, var(--accent-blue) 0%, var(--accent-green) 100%);
+            height: 100%;
+            border-radius: 50px;
+            transition: width 1.5s cubic-bezier(0.17, 0.67, 0.83, 0.67);
+        }
+
+        /* FORMULARIOS Y BOTONES */
+        .wallet-banner {
+            background: rgba(59, 130, 246, 0.1);
+            border: 2px dashed var(--accent-blue);
+            padding: 20px;
+            border-radius: 18px;
+            text-align: center;
+            margin-bottom: 25px;
+        }
+
+        .input-raizoma {
+            background: var(--bg-input);
             color: white;
-            border: 1px solid #334155;
-            padding: 14px;
-            border-radius: 12px;
+            border: 1px solid #2d3748;
+            padding: 16px;
+            border-radius: 14px;
             width: 100%;
             margin-bottom: 18px;
-            font-size: 15px;
             box-sizing: border-box;
+            font-size: 15px;
+            transition: border-color 0.3s;
         }
-        .btn-accion {
-            background-color: #3b82f6;
+
+        .input-raizoma:focus {
+            border-color: var(--accent-blue);
+            outline: none;
+        }
+
+        .btn-primario {
+            background: var(--accent-blue);
             color: white;
             border: none;
-            padding: 16px;
-            border-radius: 12px;
+            padding: 18px;
+            border-radius: 14px;
             width: 100%;
-            font-weight: bold;
+            font-weight: 800;
             cursor: pointer;
             font-size: 16px;
+            text-transform: uppercase;
+            transition: 0.3s;
         }
-        .btn-accion:hover { background-color: #2563eb; }
-        .barra-progreso-bg {
-            background-color: #0f172a;
-            border-radius: 50px;
-            height: 20px;
-            width: 100%;
-            border: 1px solid #334155;
-            margin: 15px 0;
-            overflow: hidden;
+
+        .btn-primario:hover {
+            background: #2563eb;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(37, 99, 235, 0.4);
         }
-        .barra-progreso-fill {
-            background: linear-gradient(90deg, #3b82f6, #10b981);
-            height: 100%;
-            transition: width 1s ease;
-        }
-        .tabla-estilizada {
+
+        .tabla-backoffice {
             width: 100%;
             border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        .tabla-backoffice th {
+            text-align: left;
+            color: var(--text-muted);
+            font-size: 11px;
+            text-transform: uppercase;
+            padding: 12px;
+            border-bottom: 2px solid #2d3748;
+        }
+
+        .tabla-backoffice td {
+            padding: 14px 12px;
+            border-bottom: 1px solid #1e293b;
             font-size: 14px;
         }
-        .tabla-estilizada th, .tabla-estilizada td {
-            padding: 12px;
-            border-bottom: 1px solid #334155;
-            text-align: left;
+
+        .badge {
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
         }
-        .badge-activo { color: #10b981; font-weight: bold; }
-        .badge-pendiente { color: #f59e0b; font-weight: bold; }
+
+        .badge-activo { background: rgba(16, 185, 129, 0.1); color: var(--accent-green); }
+        .badge-pendiente { background: rgba(245, 158, 11, 0.1); color: var(--accent-yellow); }
     </style>
 `;
 
 // ============================================================
-// 5. RUTAS DE NAVEGACIÓN Y REGISTRO ACTUALIZADO
+// 5. RUTAS DEL SISTEMA
 // ============================================================
 
-// --- LOGIN ---
+// --- PÁGINA DE LOGIN ---
 app.get('/', (req, res) => {
-    res.send(`<!DOCTYPE html><html><head>${html_styles}</head><body style="display:flex; align-items:center; justify-content:center; height:90vh;">
-        <div class="tarjeta-raizoma" style="width:380px;">
-            <h1 class="titulo-principal">🌳 Raízoma</h1>
-            <form action="/login" method="POST">
-                <input type="text" name="user" class="input-form" placeholder="Usuario" required>
-                <input type="password" name="pass" class="input-form" placeholder="Contraseña" required>
-                <button type="submit" class="btn-accion">ENTRAR</button>
-            </form>
-            <p style="text-align:center; margin-top:20px;"><a href="/registro" style="color:#64748b; text-decoration:none;">Crear cuenta nueva</a></p>
+    res.send(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">${html_styles}</head><body>
+        <div class="contenedor-principal" style="margin-top: 80px;">
+            <div class="tarjeta">
+                <h1 class="titulo-seccion">🌳 Raízoma Backoffice</h1>
+                <form action="/login" method="POST">
+                    <input type="text" name="user" class="input-raizoma" placeholder="Usuario de acceso" required>
+                    <input type="password" name="pass" class="input-raizoma" placeholder="Tu contraseña" required>
+                    <button type="submit" class="btn-primario">Iniciar Sesión</button>
+                </form>
+                <div style="text-align:center; margin-top:25px;">
+                    <a href="/registro" style="color:var(--text-muted); text-decoration:none; font-size:14px;">¿No tienes cuenta? <span style="color:var(--accent-blue);">Regístrate aquí</span></a>
+                </div>
+            </div>
         </div>
     </body></html>`);
 });
 
-// --- REGISTRO ACTUALIZADO CON PAQUETES Y WALLET FIJA ---
-app.get('/registro', (req, res) => {
-    const ref_code = req.query.ref || '';
-    res.send(`
-        <!DOCTYPE html>
-        <html lang="es">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Registro - Raízoma</title>
-            ${html_styles}
-        </head>
-        <body>
-            <div class="contenedor">
-                <div class="tarjeta-raizoma">
-                    <h2 class="titulo-principal">Inscripción Raízoma</h2>
-                    
-                    <div class="wallet-box">
-                        <small style="color: #3b82f6; font-weight: bold; display: block; margin-bottom: 5px;">PAGO EN USDT (RED TRC20)</small>
-                        <div class="wallet-address" id="wallet">TA4wCKDm2kNzPbJWA51CLrUAGqQcPbdtUw</div>
-                        <button onclick="copyWallet()" style="background:none; border:none; color:#64748b; font-size:12px; cursor:pointer; margin-top:5px;">[Copiar Wallet]</button>
-                    </div>
-
-                    <form action="/registro" method="POST">
-                        <input type="hidden" name="patrocinador" value="${ref_code}">
-                        
-                        <label style="color:#94a3b8; font-size:13px;">Nombre Completo</label>
-                        <input type="text" name="nombre" class="input-form" required>
-                        
-                        <label style="color:#94a3b8; font-size:13px;">Nombre de Usuario</label>
-                        <input type="text" name="usuario" class="input-form" required>
-                        
-                        <label style="color:#94a3b8; font-size:13px;">Contraseña</label>
-                        <input type="password" name="password" class="input-form" required>
-                        
-                        <label style="color:#94a3b8; font-size:13px;">Selecciona tu Modalidad:</label>
-                        <select name="plan" class="input-form">
-                            <option value="RZ Metabolico Cap. $300">RZ Metabolico Cap. - $300 MXN</option>
-                            <option value="RZ Origen $600">RZ Origen - $600 MXN</option>
-                            <option value="Membresia + RZ Origen $1,700">Membresia + RZ Origen - $1,700 MXN</option>
-                            <option value="PQT Fundador $15,000">PQT Fundador - $15,000 MXN</option>
-                        </select>
-                        
-                        <label style="color:#94a3b8; font-size:13px;">Hash de Pago (TxID)</label>
-                        <input type="text" name="hash" class="input-form" placeholder="Ingresa el comprobante de red" required>
-                        
-                        <label style="color:#94a3b8; font-size:13px;">Dirección de Envío</label>
-                        <textarea name="direccion" class="input-form" style="height: 80px;" required></textarea>
-                        
-                        <button type="submit" class="btn-accion">ENVIAR INSCRIPCIÓN</button>
-                    </form>
-                </div>
-            </div>
-            <script>
-                function copyWallet() {
-                    var range = document.createRange();
-                    range.selectNode(document.getElementById("wallet"));
-                    window.getSelection().removeAllRanges();
-                    window.getSelection().addRange(range);
-                    document.execCommand("copy");
-                    alert("Wallet copiada!");
-                }
-            </script>
-        </body>
-        </html>
-    `);
-});
-
-// --- DASHBOARD (MANTENIDO) ---
+// --- DASHBOARD V.MAX (CONTADORES Y TERMÓMETRO) ---
 app.get('/dashboard', (req, res) => {
     if (!req.session.socio) return res.redirect('/');
     const s = req.session.socio;
 
     db.all("SELECT nombre, plan, estado FROM socios WHERE patrocinador_id = ?", [s.usuario], (err, invitados) => {
-        let total_inv = invitados ? invitados.length : 0;
-        let activos_inv = 0;
-        let lista_html = "";
+        let n_totales = invitados ? invitados.length : 0;
+        let n_activos = 0;
+        let n_pendientes = 0;
+        let equipo_html = "";
 
         if (invitados) {
-            for (let i = 0; i < invitados.length; i++) {
-                if (invitados[i].estado === 'activo') activos_inv++;
-                lista_html += `<tr><td>${invitados[i].nombre}</td><td>${invitados[i].plan}</td><td class="${invitados[i].estado === 'activo' ? 'badge-activo' : 'badge-pendiente'}">${invitados[i].estado}</td></tr>`;
-            }
+            invitados.forEach(inv => {
+                if (inv.estado === 'activo') n_activos++;
+                else n_pendientes++;
+                equipo_html += `<tr>
+                    <td>${inv.nombre}</td>
+                    <td><small>${inv.plan}</small></td>
+                    <td><span class="badge ${inv.estado === 'activo' ? 'badge-activo' : 'badge-pendiente'}">${inv.estado}</span></td>
+                </tr>`;
+            });
         }
 
+        // LÓGICA DE TERMÓMETRO - META 400 PV
         let pv = s.puntos || 0;
-        let meta = pv >= 400 ? 400 : (pv >= 200 ? 400 : (pv >= 100 ? 200 : 100));
+        let meta = 100;
+        if (pv >= 400) meta = 400;
+        else if (pv >= 200) meta = 400;
+        else if (pv >= 100) meta = 200;
+        
         let porc = (pv / meta) * 100;
+        if (porc > 100) porc = 100;
 
-        res.send(`<!DOCTYPE html><html><head>${html_styles}</head><body><div class="contenedor">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                <h3>Socio: <span style="color:#3b82f6;">${s.nombre}</span></h3>
-                <a href="/logout" style="color:#ef4444; text-decoration:none;">Salir</a>
+        res.send(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">${html_styles}</head><body>
+            <div class="contenedor-principal">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:25px;">
+                    <h2 style="margin:0; font-size:20px;">Bienvenido, <span class="color-blue">${s.nombre}</span></h2>
+                    <a href="/logout" style="color:var(--accent-red); text-decoration:none; font-weight:bold; font-size:14px;">CERRAR SESIÓN</a>
+                </div>
+
+                <div class="grid-equipo">
+                    <div class="circulo-stats"><span class="stat-numero color-blue">${n_totales}</span><span class="stat-nombre">Totales</span></div>
+                    <div class="circulo-stats"><span class="stat-numero color-green">${n_activos}</span><span class="stat-nombre">Activos</span></div>
+                    <div class="circulo-stats"><span class="stat-numero color-yellow">${n_pendientes}</span><span class="stat-nombre">Espera</span></div>
+                </div>
+
+                <div class="tarjeta">
+                    <div class="meta-header">
+                        <span style="font-size:14px; color:var(--text-muted);">PUNTOS ACUMULADOS</span>
+                        <span class="color-blue" style="font-size:20px;">${pv} / ${meta} PV</span>
+                    </div>
+                    <div class="progreso-container"><div class="progreso-fill" style="width:${porc}%"></div></div>
+                    <p style="text-align:center; font-size:12px; color:var(--text-muted); margin-top:10px;">
+                        ${pv >= 400 ? '¡Meta Máxima Alcanzada!' : `Te faltan ${meta - pv} puntos para tu siguiente nivel.`}
+                    </p>
+                </div>
+
+                <div class="tarjeta" style="border-left: 6px solid var(--accent-green);">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <small style="color:var(--text-muted); font-weight:bold;">BALANCE PARA COBRO</small>
+                            <div style="font-size:32px; font-weight:900; color:var(--accent-green);">$${s.balance} MXN</div>
+                        </div>
+                        ${s.balance >= 500 && s.solicitud_retiro !== 'si' ? '<a href="#form-retiro" class="badge badge-activo" style="padding:10px 15px; cursor:pointer; text-decoration:none;">SOLICITAR</a>' : ''}
+                    </div>
+                </div>
+
+                ${s.balance >= 500 && s.solicitud_retiro !== 'si' ? `
+                <div id="form-retiro" class="tarjeta">
+                    <h3 class="color-green" style="margin-top:0;">Solicitar Pago</h3>
+                    <form action="/enviar-solicitud-retiro" method="POST">
+                        <label style="font-size:12px; color:var(--text-muted);">Datos Bancarios o Billetera USDT:</label>
+                        <textarea name="datos_pago" class="input-raizoma" style="height:100px; margin-top:8px;" placeholder="Banco, CLABE, Nombre del titular..." required></textarea>
+                        <button type="submit" class="btn-primario" style="background:var(--accent-green);">Confirmar Solicitud</button>
+                    </form>
+                </div>` : ''}
+
+                <div class="tarjeta">
+                    <h4 style="margin-top:0;">Enlace de Invitación</h4>
+                    <input type="text" class="input-raizoma" value="https://mi-backoffice-ra8q.onrender.com/registro?ref=${s.usuario}" readonly>
+                    
+                    <h4 style="text-align:center; margin:30px 0 15px 0;">MI RED DIRECTA</h4>
+                    <div style="max-height:300px; overflow-y:auto;">
+                        <table class="tabla-backoffice">
+                            <thead><tr><th>Nombre</th><th>Paquete</th><th>Estado</th></tr></thead>
+                            <tbody>${equipo_html || '<tr><td colspan="3" style="text-align:center;">No tienes invitados directos aún.</td></tr>'}</tbody>
+                        </table>
+                    </div>
+                </div>
+
+                ${s.usuario === 'ADMINRZ' ? '<a href="/codigo-1-panel" class="btn-primario" style="background:var(--accent-yellow); margin-top:10px; display:block; text-align:center; text-decoration:none;">ENTRAR AL PANEL MAESTRO</a>' : ''}
             </div>
-
-            <div class="tarjeta-raizoma">
-                <div style="display:flex; justify-content:space-between;"><span>Progreso de Bono</span><b>${pv} / ${meta} PV</b></div>
-                <div class="barra-progreso-bg"><div class="barra-progreso-fill" style="width:${porc}%;"></div></div>
-            </div>
-
-            <div class="tarjeta-raizoma" style="border-left: 5px solid #10b981;">
-                <small>Balance para Cobro</small>
-                <div style="font-size:28px; font-weight:bold; color:#10b981;">$${s.balance} MXN</div>
-                ${s.balance >= 500 && s.solicitud_retiro !== 'si' ? '<a href="#form-retiro" class="btn-accion" style="display:block; text-align:center; text-decoration:none; margin-top:10px;">SOLICITAR PAGO</a>' : ''}
-                ${s.solicitud_retiro === 'si' ? '<p class="badge-pendiente">Retiro en proceso...</p>' : ''}
-            </div>
-
-            ${s.balance >= 500 && s.solicitud_retiro !== 'si' ? `
-            <div id="form-retiro" class="tarjeta-raizoma">
-                <h4>Solicitud de Retiro</h4>
-                <form action="/enviar-solicitud-retiro" method="POST">
-                    <textarea name="datos_pago" class="input-form" placeholder="Datos bancarios o Wallet USDT..." required></textarea>
-                    <button type="submit" class="btn-accion" style="background:#10b981;">ENVIAR SOLICITUD</button>
-                </form>
-            </div>` : ''}
-
-            <div class="tarjeta-raizoma">
-                <small>Enlace de Referido</small>
-                <input type="text" class="input-form" value="https://mi-backoffice-ra8q.onrender.com/registro?ref=${s.usuario}" readonly>
-                <h4 style="margin-top:20px; text-align:center;">Mi Equipo (${total_inv})</h4>
-                <table class="tabla-estilizada">
-                    <thead><tr><th>Socio</th><th>Plan</th><th>Estado</th></tr></thead>
-                    <tbody>${lista_html || '<tr><td colspan="3">Sin invitados</td></tr>'}</tbody>
-                </table>
-            </div>
-
-            ${s.usuario === 'ADMINRZ' ? '<a href="/codigo-1-panel" class="btn-accion" style="display:block; text-align:center; text-decoration:none; background:#f59e0b;">PANEL ADMIN</a>' : ''}
-        </div></body></html>`);
+        </body></html>`);
     });
 });
 
+// --- PÁGINA DE REGISTRO (CON WALLET FIJA Y PAQUETES) ---
+app.get('/registro', (req, res) => {
+    const ref = req.query.ref || '';
+    res.send(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">${html_styles}</head><body>
+        <div class="contenedor-principal">
+            <div class="tarjeta">
+                <h2 class="titulo-seccion">Registro de Nuevo Socio</h2>
+                
+                <div class="wallet-banner">
+                    <small style="color:var(--accent-blue); font-weight:bold;">PAGO USDT (TRC20)</small>
+                    <div id="w-copy" style="color:var(--accent-green); font-family:monospace; font-size:15px; font-weight:bold; margin:8px 0;">TA4wCKDm2kNzPbJWA51CLrUAGqQcPbdtUw</div>
+                    <button onclick="copyW()" style="background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:12px;">[Copiar Dirección]</button>
+                </div>
+
+                <form action="/registro" method="POST">
+                    <input type="hidden" name="patrocinador" value="${ref}">
+                    <input type="text" name="nombre" class="input-raizoma" placeholder="Nombre y Apellido" required>
+                    <input type="text" name="usuario" class="input-raizoma" placeholder="Crea un nombre de usuario" required>
+                    <input type="password" name="password" class="input-raizoma" placeholder="Contraseña segura" required>
+                    
+                    <label style="color:var(--text-muted); font-size:12px; padding-left:5px;">Elige tu modalidad:</label>
+                    <select name="plan" class="input-raizoma" style="height:60px; margin-top:5px;">
+                        <option value="RZ Metabolico Cap. $300">RZ Metabolico Cap. - $300 MXN</option>
+                        <option value="RZ Origen $600">RZ Origen - $600 MXN</option>
+                        <option value="Membresia + RZ Origen $1,700">Membresia + RZ Origen - $1,700 MXN</option>
+                        <option value="PQT Fundador $15,000">PQT Fundador - $15,000 MXN</option>
+                    </select>
+
+                    <input type="text" name="hash" class="input-raizoma" placeholder="Hash de Pago / TxID" required>
+                    <textarea name="direccion" class="input-raizoma" style="height:80px;" placeholder="Dirección completa para envío de productos" required></textarea>
+                    
+                    <button type="submit" class="btn-primario">Finalizar Registro</button>
+                </form>
+            </div>
+        </div>
+        <script>function copyW(){var r=document.createRange();r.selectNode(document.getElementById("w-copy"));window.getSelection().removeAllRanges();window.getSelection().addRange(r);document.execCommand("copy");alert("Dirección copiada exitosamente.");}</script>
+    </body></html>`);
+});
+
 // ============================================================
-// 6. PROCESAMIENTO Y PANEL ADMIN
+// 6. CONTROLADORES POST
 // ============================================================
 
 app.post('/login', (req, res) => {
-    db.get("SELECT * FROM socios WHERE usuario = ? AND password = ?", [req.body.user, req.body.pass], (err, row) => {
+    const { user, pass } = req.body;
+    db.get("SELECT * FROM socios WHERE usuario = ? AND password = ?", [user, pass], (err, row) => {
         if (row) { req.session.socio = row; res.redirect('/dashboard'); }
-        else { res.send("<script>alert('Error'); window.location='/';</script>"); }
+        else { res.send("<script>alert('Error: Usuario o clave incorrectos.'); window.location='/';</script>"); }
     });
 });
 
@@ -334,43 +446,49 @@ app.post('/registro', (req, res) => {
     const { nombre, usuario, password, patrocinador, plan, hash, direccion } = req.body;
     db.run(`INSERT INTO socios (nombre, usuario, password, patrocinador_id, plan, hash_pago, direccion) VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [nombre, usuario, password, patrocinador, plan, hash, direccion], (err) => {
-            res.send("<body style='background:#0f172a; color:white; text-align:center; padding-top:50px;'><h1>Registro Recibido</h1><p>En espera de activación.</p><a href='/'>Volver</a></body>");
+            res.send("<body style='background:#0b0f19; color:white; text-align:center; padding-top:100px;'><h1>¡Registro Enviado!</h1><p>Tu cuenta se activará al confirmar el pago en el sistema.</p><a href='/' style='color:#3b82f6;'>Regresar</a></body>");
         });
 });
 
 app.post('/enviar-solicitud-retiro', (req, res) => {
+    if (!req.session.socio) return res.redirect('/');
     db.run("UPDATE socios SET solicitud_retiro = 'si', detalles_retiro = ? WHERE id = ?", [req.body.datos_pago, req.session.socio.id], () => {
-        res.send("<script>alert('Enviado'); window.location='/dashboard';</script>");
+        res.send("<script>alert('Solicitud enviada correctamente.'); window.location='/dashboard';</script>");
     });
 });
+
+// ============================================================
+// 7. PANEL ADMINISTRATIVO (CON BOTÓN DESACTIVAR)
+// ============================================================
 
 app.get('/codigo-1-panel', (req, res) => {
     if (!req.session.socio || req.session.socio.usuario !== 'ADMINRZ') return res.redirect('/');
     db.all("SELECT * FROM socios", (err, rows) => {
         let f = "";
-        for (let j = 0; j < rows.length; j++) {
-            let r = rows[j];
-            let bg = r.solicitud_retiro === 'si' ? "background:#450a0a;" : "";
-            f += `<tr style="${bg}">
+        rows.forEach(r => {
+            let row_style = r.solicitud_retiro === 'si' ? "background:rgba(239, 68, 68, 0.1);" : "";
+            f += `<tr style="${row_style}">
                 <td>${r.nombre}<br><small>${r.usuario}</small></td>
-                <td>${r.plan}</td>
-                <td>$${r.balance}</td>
-                <td>${r.estado}</td>
+                <td><small>${r.plan}</small></td>
+                <td class="color-green" style="font-weight:bold;">$${r.balance}</td>
+                <td><small style="font-size:10px;">${r.detalles_retiro || 'N/A'}</small></td>
                 <td>
-                    <a href="/aprobar-socio/${r.id}" style="color:#3b82f6;">Activar</a> | 
-                    <a href="/desactivar-socio/${r.id}" style="color:#ef4444;">Baja</a> | 
-                    <a href="/marcar-pagado/${r.id}" style="color:#10b981;">Pagado</a>
+                    <a href="/aprobar-socio/${r.id}" style="color:var(--accent-blue); text-decoration:none; font-weight:bold;">ACTIVAR</a><br>
+                    <a href="/desactivar-socio/${r.id}" style="color:var(--accent-red); text-decoration:none; font-size:11px;">DESACTIVAR</a><br>
+                    <a href="/marcar-pagado/${r.id}" style="color:var(--accent-green); text-decoration:none; font-weight:bold;">PAGADO</a>
                 </td>
             </tr>`;
-        }
+        });
         res.send(`<!DOCTYPE html><html><head>${html_styles}</head><body>
-            <div class="tarjeta-raizoma" style="max-width:900px; margin:auto;">
-                <h2>Panel Maestro</h2>
-                <table class="tabla-estilizada">
-                    <thead><tr><th>Socio</th><th>Plan</th><th>Balance</th><th>Estado</th><th>Acciones</th></tr></thead>
-                    <tbody>${f}</tbody>
-                </table>
-                <br><a href="/dashboard">Cerrar Panel</a>
+            <div class="tarjeta" style="max-width:950px; margin:auto; width:95%;">
+                <h2 class="titulo-seccion">Panel de Administración Raízoma</h2>
+                <div style="overflow-x:auto;">
+                    <table class="tabla-backoffice">
+                        <thead><tr><th>Socio</th><th>Modalidad</th><th>Balance</th><th>Retiro</th><th>Acciones</th></tr></thead>
+                        <tbody>${f}</tbody>
+                    </table>
+                </div>
+                <br><a href="/dashboard" class="btn-primario" style="display:block; text-align:center; text-decoration:none;">Cerrar Panel</a>
             </div>
         </body></html>`);
     });
@@ -401,4 +519,13 @@ app.get('/marcar-pagado/:id', (req, res) => {
 });
 
 app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/'); });
-app.listen(port, () => console.log(`Raízoma V.MODALIDADES en puerto ${port}`));
+
+// ============================================================
+// 8. LANZAMIENTO
+// ============================================================
+app.listen(port, () => {
+    console.log("==========================================");
+    console.log("SERVIDOR RAÍZOMA V.MAX PROTECTED 2026 ACTIVADO");
+    console.log(`PUERTO: ${port} | META PV: 400`);
+    console.log("==========================================");
+});
