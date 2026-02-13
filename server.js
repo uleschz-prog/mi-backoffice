@@ -148,4 +148,87 @@ app.post('/enviar', (req, res) => {
 
 // PUERTO DINÁMICO
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, '0.0.0.0', () => console.log(`Raízoma operando en puerto ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`Raízoma operando en puerto ${PORT}`));{
+  "name": "raizoma-backoffice",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "sqlite3": "^5.1.6"
+  }
+}
+const express = require('express');
+const sqlite3 = require('sqlite3').verbose();
+const path = require('path');
+const app = express();
+
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+
+// Base de datos (Usa memoria si falla el disco para que SIEMPRE funcione)
+const db = new sqlite3.Database(':memory:', (err) => {
+    if (err) console.error("Error BD:", err);
+});
+
+db.serialize(() => {
+    db.run("CREATE TABLE socios (id INTEGER PRIMARY KEY, nombre TEXT, direccion TEXT, vol REAL, hash TEXT)");
+});
+
+// LÓGICA DE NEGOCIO RAIZOMA
+function calcularBono(v) {
+    if (v >= 60000) return { p: v * 0.20, r: "Senior Managing Partner" };
+    if (v >= 30000) return { p: 4500, r: "Director Partner" };
+    if (v >= 15000) return { p: 1500, r: "Asociado Partner" };
+    return { p: 0, r: "Socio" };
+}
+
+// VISTA DASHBOARD
+app.get('/', (req, res) => {
+    db.all("SELECT * FROM socios", (err, rows) => {
+        res.send(`
+        <body style="font-family:sans-serif; background:#f0f2f5; padding:20px;">
+            <div style="max-width:800px; margin:auto; background:white; padding:30px; border-radius:15px; box-shadow:0 4px 10px rgba(0,0,0,0.1);">
+                <h1 style="color:#1a237e;">Raízoma: Cuenta Madre</h1>
+                <a href="/unete" style="background:#2ecc71; color:white; padding:10px; border-radius:5px; text-decoration:none; float:right;">+ Nuevo Socio</a>
+                <br><br>
+                <table style="width:100%; border-collapse:collapse;">
+                    <tr style="background:#f8fafc; text-align:left;"><th>Socio / Logística</th><th>Volumen</th><th>Bono Gestión</th></tr>
+                    ${rows.map(s => {
+                        const b = calcularBono(s.vol);
+                        return `<tr>
+                            <td style="padding:10px; border-bottom:1px solid #eee;"><b>${s.nombre}</b><br><small>${s.direccion}</small></td>
+                            <td style="border-bottom:1px solid #eee;">$${s.vol}</td>
+                            <td style="color:green; font-weight:bold; border-bottom:1px solid #eee;">$${b.p} <br><small style="color:blue;">${b.r}</small></td>
+                        </tr>`;
+                    }).join('')}
+                </table>
+            </div>
+        </body>`);
+    });
+});
+
+// VISTA REGISTRO
+app.get('/unete', (req, res) => {
+    res.send(`
+    <body style="background:#1a237e; font-family:sans-serif; display:flex; justify-content:center; align-items:center; height:100vh;">
+        <form action="/reg" method="POST" style="background:white; padding:30px; border-radius:15px; width:350px;">
+            <h2>Registro Raízoma</h2>
+            <input name="n" placeholder="Nombre" style="width:100%; margin-bottom:10px; padding:10px;" required>
+            <textarea name="d" placeholder="Dirección de Envío" style="width:100%; margin-bottom:10px; padding:10px;" required></textarea>
+            <div style="background:#e8f5e9; padding:10px; font-size:11px; margin-bottom:10px;">
+                <b>Wallet TRC20:</b><br>TA4wCKDm2kNzPbJWA51CLrUAGqQcPbdtUw
+            </div>
+            <input name="v" type="number" placeholder="Monto ($)" style="width:100%; margin-bottom:10px; padding:10px;" required>
+            <button type="submit" style="width:100%; padding:10px; background:#2ecc71; color:white; border:none; cursor:pointer;">REGISTRAR</button>
+        </form>
+    </body>`);
+});
+
+app.post('/reg', (req, res) => {
+    db.run("INSERT INTO socios (nombre, direccion, vol) VALUES (?,?,?)", [req.body.n, req.body.d, req.body.v], () => res.redirect('/'));
+});
+
+app.listen(process.env.PORT || 10000, '0.0.0.0');
