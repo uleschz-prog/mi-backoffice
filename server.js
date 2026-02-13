@@ -12,7 +12,7 @@ app.use(session({
 }));
 
 const ADMIN_PASSWORD = "RAIZOMA_MASTER_ADMIN"; 
-const dbPath = path.join('/data', 'raizoma.db'); 
+const dbPath = path.join(__dirname, 'raizoma.db'); 
 const db = new sqlite3.Database(dbPath);
 
 db.serialize(() => {
