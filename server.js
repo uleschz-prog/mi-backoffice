@@ -1,167 +1,184 @@
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
+const path = require('path');
+const session = require('express-session');
 const app = express();
 
 app.use(express.urlencoded({ extended: true }));
+app.use(session({
+    secret: 'raizoma-super-link-2026',
+    resave: false,
+    saveUninitialized: true
+}));
 
-// BASE DE DATOS TOTAL (Mantiene TODO lo anterior + nuevos campos)
-const db = new sqlite3.Database(':memory:');
+const ADMIN_PASSWORD = "RAIZOMA_MASTER_ADMIN"; 
+const dbPath = path.join('/data', 'raizoma.db'); 
+const db = new sqlite3.Database(dbPath);
+
 db.serialize(() => {
-    db.run(`CREATE TABLE socios (
+    db.run(`CREATE TABLE IF NOT EXISTS socios (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        usuario TEXT UNIQUE,
+        password TEXT,
         nombre TEXT, 
         direccion TEXT, 
         patrocinador TEXT, 
         plan TEXT, 
         volumen REAL, 
         hash TEXT, 
-        estado TEXT DEFAULT 'pendiente',
+        estado TEXT DEFAULT 'pendiente', 
         fecha TEXT
     )`);
 });
 
-// LÓGICA DE BONOS INTEGRADA (Bono 1: 15% + Bono 2: Gestión)
 function calcularBonos(monto) {
-    const bonoInicio = monto * 0.15;
-    let bonoGestion = 0;
-    let rango = "Socio Activo";
-
-    if (monto >= 15000) {
-        bonoGestion = 1500;
-        rango = "Partner Fundador";
-    } else if (monto >= 1750) {
-        rango = "Membresía VIP";
-    }
-    
-    return { 
-        total: bonoInicio + bonoGestion, 
-        inicio: bonoInicio, 
-        gestion: bonoGestion, 
-        rango: rango,
-        pv: monto / 1000 
-    };
+    const inicio = monto * 0.15;
+    const gestion = (monto >= 15000) ? 1500 : 0;
+    return { total: inicio + gestion, pv: monto / 1000 };
 }
 
-// 1. DASHBOARD PROFESIONAL (Mantiene el diseño que te encantó)
+// --- LOGIN ---
 app.get('/', (req, res) => {
-    db.all("SELECT * FROM socios WHERE estado = 'aprobado'", (err, rows) => {
-        const stats = rows.reduce((acc, s) => {
-            const c = calcularBonos(s.volumen);
-            return {
-                vol: acc.vol + s.volumen,
-                gan: acc.gan + c.total,
-                pv: acc.pv + c.pv,
-                nuevos: acc.nuevos + (s.plan === 'Partner Fundador' ? 1 : 0)
-            };
-        }, { vol: 0, gan: 0, pv: 0, nuevos: 0 });
+    res.send(`
+    <body style="background:#0b0e11; color:white; font-family:sans-serif; display:flex; justify-content:center; align-items:center; min-height:100vh; margin:0;">
+        <div style="text-align:center; background:#181a20; padding:40px; border-radius:24px; border:1px solid #334155; width:320px;">
+            <h1 style="color:#3b82f6; margin-bottom:30px;">Raízoma</h1>
+            <form action="/login" method="POST">
+                <input name="user" placeholder="Usuario" style="width:100%; padding:14px; margin-bottom:15px; background:#0b0e11; border:1px solid #334155; border-radius:12px; color:white;" required>
+                <input type="password" name="pass" placeholder="Contraseña" style="width:100%; padding:14px; margin-bottom:20px; background:#0b0e11; border:1px solid #334155; border-radius:12px; color:white;" required>
+                <button style="width:100%; padding:16px; background:#3b82f6; color:white; border:none; border-radius:12px; font-weight:bold; cursor:pointer;">ENTRAR</button>
+            </form>
+            <p style="font-size:12px; color:#94a3b8; margin-top:20px;">¿No tienes cuenta? <a href="/unete" style="color:#3b82f6; text-decoration:none;">Inscríbete aquí</a></p>
+        </div>
+    </body>`);
+});
 
-        res.send(`
-        <!DOCTYPE html>
-        <html lang="es">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <style>
-                :root { --bg: #0b0e11; --card: #181a20; --accent: #3b82f6; --text: #eaecef; }
-                body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; padding-bottom: 100px; }
-                .dashboard { max-width: 800px; margin: auto; }
-                .ganancias-card { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border-radius: 20px; padding: 30px; border: 1px solid #334155; margin-bottom: 25px; }
-                .residual-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
-                .stat-box { background: var(--card); padding: 20px; border-radius: 18px; border: 1px solid #334155; }
-                .nav-bar { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(24, 26, 32, 0.9); backdrop-filter: blur(10px); padding: 15px 40px; border-radius: 30px; display: flex; gap: 50px; border: 1px solid #475569; }
-                .nav-item { text-align: center; font-size: 11px; color: #94a3b8; text-decoration: none; }
-            </style>
-        </head>
-        <body>
-            <div class="dashboard">
-                <h2 style="font-size:20px; margin-bottom:20px;">Oficina <span style="color:var(--accent)">Raízoma</span></h2>
-                
-                <div style="color:#94a3b8; font-size:14px; margin-bottom:10px;">Tus Ganancias</div>
-                <div class="ganancias-card">
-                    <div style="color:#94a3b8; font-size:14px;">💰 Disponible</div>
-                    <div style="font-size:38px; font-weight:800; color:white; margin:10px 0;">$${stats.gan.toLocaleString()}.<small>00</small></div>
-                    <a href="#" style="color:var(--accent); text-decoration:none; font-weight:bold; font-size:14px;">Retirar ></a>
-                </div>
-
-                <div style="color:#94a3b8; font-size:14px; margin-bottom:10px;">Tu Bono Residual</div>
-                <div class="residual-grid">
-                    <div class="stat-box"><small style="color:#94a3b8">Total Activos</small><div style="font-size:24px; font-weight:700;">${rows.length}</div></div>
-                    <div class="stat-box"><small style="color:#94a3b8">Total Nuevos</small><div style="font-size:24px; font-weight:700;">${stats.nuevos}</div></div>
-                    <div class="stat-box"><small style="color:#94a3b8">Total Volumen PV</small><div style="font-size:24px; font-weight:700;">${stats.pv} <small style="font-size:12px; color:#94a3b8;">PV</small></div></div>
-                    <div class="stat-box"><small style="color:#94a3b8">Estatus</small><div style="font-size:18px; color:#2ecc71; font-weight:bold;">ACTIVO ✅</div></div>
-                </div>
-
-                <div class="nav-bar">
-                    <a href="/" class="nav-item" style="color:white;">🏠<br>Mi Oficina</a>
-                    <a href="/unete" class="nav-item">👤<br>Registrar</a>
-                </div>
-            </div>
-        </body>
-        </html>`);
+app.post('/login', (req, res) => {
+    const { user, pass } = req.body;
+    if (user === 'admin' && pass === ADMIN_PASSWORD) {
+        req.session.admin = true;
+        return res.redirect('/codigo-1-panel');
+    }
+    db.get("SELECT * FROM socios WHERE usuario = ? AND password = ?", [user, pass], (err, row) => {
+        if (row) { req.session.socio = row; res.redirect('/dashboard'); } 
+        else { res.send('Error. <a href="/">Reintentar</a>'); }
     });
 });
 
-// 2. REGISTRO COMPLETO (Dirección, Patrocinador y Planes Fijos)
-app.get('/unete', (req, res) => {
-    res.send(`
-    <body style="background:#0b0e11; color:white; font-family:sans-serif; display:flex; justify-content:center; align-items:center; min-height:100vh; margin:0; padding:20px;">
-        <div style="background:#181a20; padding:35px; border-radius:24px; width:100%; max-width:420px; border:1px solid #334155;">
-            <h2 style="text-align:center; margin-top:0;">Inscripción Raízoma</h2>
-            <form action="/reg" method="POST">
-                <input name="n" placeholder="Nombre completo" style="width:100%; margin-bottom:15px; padding:14px; background:#0b0e11; border:1px solid #334155; border-radius:12px; color:white; box-sizing:border-box;" required>
-                <input name="dir" placeholder="Dirección de envío completa" style="width:100%; margin-bottom:15px; padding:14px; background:#0b0e11; border:1px solid #334155; border-radius:12px; color:white; box-sizing:border-box;" required>
-                <input name="pat" placeholder="ID de Patrocinador" style="width:100%; margin-bottom:15px; padding:14px; background:#0b0e11; border:1px solid #334155; border-radius:12px; color:white; box-sizing:border-box;" required>
-                
-                <label style="font-size:12px; color:var(--accent);">SELECCIONA TU PLAN:</label>
-                <select name="plan_monto" style="width:100%; margin:10px 0 20px; padding:14px; background:#0b0e11; border:1px solid #3b82f6; border-radius:12px; color:white;" required>
-                    <option value="Membresía VIP|1750">Membresía VIP - $1,750 MXN</option>
-                    <option value="Partner Fundador|15000">Partner Fundador - $15,000 MXN</option>
-                </select>
+// --- BACKOFFICE CON LINK DE REFERIDO ---
+app.get('/dashboard', (req, res) => {
+    if (!req.session.socio) return res.redirect('/');
+    const s = req.session.socio;
+    const refLink = `${req.protocol}://${req.get('host')}/unete?ref=${s.usuario}`;
 
-                <div style="background:#0b0e11; padding:15px; border-radius:12px; border:1px dashed #2ecc71; margin-bottom:15px; font-size:10px;">
-                    <span style="color:#94a3b8;">USDT TRC20:</span><br>
-                    <code style="color:#2ecc71;">TA4wCKDm2kNzPbJWA51CLrUAGqQcPbdtUw</code>
+    db.all("SELECT * FROM socios WHERE patrocinador = ?", [s.usuario], (err, equipo) => {
+        const bonos = s.estado === 'aprobado' ? calcularBonos(s.volumen) : { total: 0, pv: 0 };
+        res.send(`
+        <body style="background:#0b0e11; color:white; font-family:sans-serif; padding:20px;">
+            <div style="max-width:600px; margin:auto;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h3>Hola, ${s.nombre}</h3>
+                    <a href="/logout" style="color:#ef4444; text-decoration:none; font-size:12px;">Salir</a>
                 </div>
-                <input name="hash" placeholder="Hash de Pago (TxID)" style="width:100%; margin-bottom:20px; padding:14px; background:#0b0e11; border:1px solid #334155; border-radius:12px; color:white; box-sizing:border-box;" required>
-                
-                <button type="submit" style="width:100%; padding:18px; background:#3b82f6; color:white; border:none; border-radius:14px; font-weight:bold; cursor:pointer;">ENVIAR REGISTRO</button>
-            </form>
-        </div>
+
+                <div style="background:#1e293b; padding:15px; border-radius:15px; margin-bottom:20px; border:1px solid #3b82f6;">
+                    <small style="color:#94a3b8;">Tu Enlace de Invitación:</small>
+                    <div style="display:flex; gap:10px; margin-top:5px;">
+                        <input value="${refLink}" id="refLink" readonly style="flex:1; background:#0b0e11; border:1px solid #334155; color:#3b82f6; padding:8px; border-radius:8px; font-size:11px;">
+                        <button onclick="copyLink()" style="background:#3b82f6; color:white; border:none; border-radius:8px; padding:0 15px; cursor:pointer; font-size:11px;">Copiar</button>
+                    </div>
+                </div>
+
+                <div style="background:linear-gradient(135deg, #1e293b, #0f172a); padding:30px; border-radius:24px; border:1px solid #334155; margin-bottom:20px;">
+                    <small style="color:#94a3b8;">Comisiones Raízoma</small>
+                    <div style="font-size:38px; font-weight:bold; margin:10px 0;">$${bonos.total.toLocaleString()}</div>
+                    <div style="font-size:12px; color:${s.estado === 'aprobado' ? '#2ecc71' : '#f1c40f'}">ESTATUS: ${s.estado.toUpperCase()}</div>
+                </div>
+
+                <h4 style="color:#3b82f6;">Mi Equipo Directo (${equipo.length})</h4>
+                <div style="background:#181a20; border-radius:18px; border:1px solid #334155; overflow:hidden;">
+                    <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                        <tr style="background:#1e293b; color:#94a3b8;"><th style="padding:12px; text-align:left;">Socio</th><th>Plan</th><th>Estatus</th></tr>
+                        ${equipo.map(e => `
+                            <tr style="border-bottom:1px solid #334155;">
+                                <td style="padding:12px;">${e.nombre}</td>
+                                <td style="text-align:center;">${e.plan}</td>
+                                <td style="text-align:center; color:${e.estado === 'aprobado' ? '#2ecc71' : '#f1c40f'}">${e.estado}</td>
+                            </tr>
+                        `).join('')}
+                    </table>
+                </div>
+            </div>
+            <script>
+                function copyLink() {
+                    var copyText = document.getElementById("refLink");
+                    copyText.select();
+                    document.execCommand("copy");
+                    alert("¡Enlace copiado! Envíalo a tu nuevo socio.");
+                }
+            </script>
+        </body>`);
+    });
+});
+
+// --- REGISTRO CON AUTO-REFERIDO ---
+app.get('/unete', (req, res) => {
+    const patrocinadorSug = req.query.ref || '';
+    res.send(`
+    <body style="background:#0b0e11; color:white; font-family:sans-serif; display:flex; justify-content:center; align-items:center; min-height:100vh; padding:20px;">
+        <form action="/reg" method="POST" style="background:#181a20; padding:35px; border-radius:24px; width:100%; max-width:400px; border:1px solid #334155;">
+            <h2 style="text-align:center;">Nueva Inscripción</h2>
+            <input name="user" placeholder="Usuario (ID único)" style="width:100%; margin-bottom:10px; padding:12px; background:#0b0e11; border:1px solid #334155; border-radius:10px; color:white;" required>
+            <input type="password" name="pass" placeholder="Contraseña" style="width:100%; margin-bottom:20px; padding:12px; background:#0b0e11; border:1px solid #334155; border-radius:10px; color:white;" required>
+            <input name="n" placeholder="Nombre completo" style="width:100%; margin-bottom:10px; padding:12px; background:#0b0e11; border:1px solid #334155; border-radius:10px; color:white;" required>
+            <input name="dir" placeholder="Dirección de envío" style="width:100%; margin-bottom:10px; padding:12px; background:#0b0e11; border:1px solid #334155; border-radius:10px; color:white;" required>
+            <input name="pat" placeholder="Usuario Patrocinador" value="${patrocinadorSug}" style="width:100%; margin-bottom:10px; padding:12px; background:#0b0e11; border:1px solid #3b82f6; border-radius:10px; color:white;" required>
+            <select name="plan_monto" style="width:100%; margin-bottom:15px; padding:12px; background:#0b0e11; border:1px solid #334155; border-radius:10px; color:white;">
+                <option value="VIP|1750">Membresía VIP - $1,750</option>
+                <option value="Partner|15000">Partner Fundador - $15,000</option>
+            </select>
+            <input name="hash" placeholder="Hash de Pago (TxID)" style="width:100%; margin-bottom:20px; padding:12px; background:#0b0e11; border:1px solid #334155; border-radius:10px; color:white;" required>
+            <button type="submit" style="width:100%; padding:18px; background:#3b82f6; color:white; border:none; border-radius:14px; font-weight:bold; cursor:pointer;">FINALIZAR INSCRIPCIÓN</button>
+        </form>
     </body>`);
 });
 
 app.post('/reg', (req, res) => {
     const [plan, monto] = req.body.plan_monto.split('|');
-    db.run("INSERT INTO socios (nombre, direccion, patrocinador, plan, volumen, hash, fecha) VALUES (?,?,?,?,?,?,?)", 
-    [req.body.n, req.body.dir, req.body.pat, plan, monto, req.body.hash, new Date().toLocaleDateString()], 
-    () => res.send('<body style="background:#0b0e11; color:white; text-align:center; padding-top:100px; font-family:sans-serif;"><h1>✅ ¡Listo!</h1><p>Tu pago está siendo verificado.</p><a href="/" style="color:#3b82f6;">Regresar</a></body>'));
+    db.run("INSERT INTO socios (usuario, password, nombre, direccion, patrocinador, plan, volumen, hash, fecha) VALUES (?,?,?,?,?,?,?,?,?)", 
+    [req.body.user, req.body.pass, req.body.n, req.body.dir, req.body.pat, plan, monto, req.body.hash, new Date().toLocaleDateString()], 
+    () => res.send('<body style="background:#0b0e11; color:white; text-align:center; padding-top:100px;"><h2>¡Socio Registrado!</h2><a href="/" style="color:#3b82f6;">Regresar</a></body>'));
 });
 
-// 3. ADMIN PRIVADO (Ver direcciones y activar bonos)
-app.get('/admin-raizoma', (req, res) => {
-    db.all("SELECT rowid AS id, * FROM socios WHERE estado = 'pendiente'", (err, rows) => {
+// --- PANEL CÓDIGO 1 ---
+app.get('/codigo-1-panel', (req, res) => {
+    if (!req.session.admin) return res.redirect('/');
+    db.all("SELECT * FROM socios", (err, rows) => {
         res.send(`
         <body style="background:#0b0e11; color:white; font-family:sans-serif; padding:20px;">
-            <h2>Panel de Activación Raízoma</h2>
-            <table border="1" style="width:100%; border-collapse:collapse; background:#181a20;">
-                <tr><th>Socio</th><th>Plan</th><th>Dirección de Envío</th><th>Hash</th><th>Acción</th></tr>
+            <h2>Admin Master: Control de Red</h2>
+            <table border="1" style="width:100%; border-collapse:collapse; background:#181a20; font-size:12px;">
+                <tr style="background:#334155;"><th>Usuario</th><th>Socio</th><th>Patrocinador</th><th>Plan</th><th>Acción</th></tr>
                 ${rows.map(r => `
-                    <tr>
-                        <td>${r.nombre}<br><small>Patr: ${r.patrocinador}</small></td>
-                        <td>$${r.volumen}</td>
-                        <td style="font-size:11px;">${r.direccion}</td>
-                        <td><small>${r.hash}</small></td>
-                        <td><a href="/aprobar/${r.id}" style="color:#2ecc71;">[APROBAR]</a></td>
-                    </tr>
-                `).join('')}
+                <tr>
+                    <td style="padding:10px;">${r.usuario}</td>
+                    <td>${r.nombre}<br><small>${r.direccion}</small></td>
+                    <td>${r.patrocinador}</td>
+                    <td>${r.plan} ($${r.volumen})</td>
+                    <td>${r.estado === 'pendiente' ? `<a href="/activar/${r.id}" style="color:#3b82f6;">[APROBAR]</a>` : '✅ ACTIVO'}</td>
+                </tr>`).join('')}
             </table>
-            <br><a href="/" style="color:white;">Dashboard</a>
+            <br><a href="/logout" style="color:white;">Salir</a>
         </body>`);
     });
 });
 
-app.get('/aprobar/:id', (req, res) => {
-    db.run("UPDATE socios SET estado = 'aprobado' WHERE rowid = ?", [req.params.id], () => res.redirect('/admin-raizoma'));
+app.get('/activar/:id', (req, res) => {
+    if (!req.session.admin) return res.send('No');
+    db.run("UPDATE socios SET estado = 'aprobado' WHERE id = ?", [req.params.id], () => res.redirect('/codigo-1-panel'));
 });
 
+app.get('/logout', (req, res) => { req.session.destroy(); res.redirect('/'); });
+
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log('Sistema Raízoma 100% Completo'));
+app.listen(PORT, () => console.log('Raízoma V10: Link de Referencia Activo'));
