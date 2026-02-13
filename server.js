@@ -18,7 +18,7 @@ const port = process.env.PORT || 10000;
 const dirData = process.env.RENDER_DISK_PATH || '/data';
 const db = new sqlite3.Database(path.join(dirData, 'raizoma_origen_final.db'));
 
-// ESTRUCTURA COMPLETA DE 16 VARIABLES
+// ESTRUCTURA COMPLETA + monto_solicitado para solicitudes de retiro
 db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS socios (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -28,6 +28,7 @@ db.serialize(() => {
         balance REAL DEFAULT 0, puntos INTEGER DEFAULT 0, volumen_red REAL DEFAULT 0,
         bono_cobrado REAL DEFAULT 0, solicitud_retiro TEXT DEFAULT 'no', detalles_retiro TEXT
     )`);
+    db.run("ALTER TABLE socios ADD COLUMN monto_solicitado REAL DEFAULT 0", () => {}); // Migración; ignora si ya existe
     db.run("INSERT OR IGNORE INTO socios (nombre, usuario, password, estado, plan) VALUES ('Admin Maestro', 'ADMINRZ', 'ROOT', 'activo', 'MASTER')");
 });
 
@@ -82,6 +83,17 @@ app.get('/registro', (req, res) => {
     res.send(`<html>${cssOrigen}<body><div class="card"><h2>Registro Origen</h2>${msgPatrocinador}<form action="/reg" method="POST"><input type="hidden" name="ref" value="${ref}"><input name="n" class="vmax-input" placeholder="Nombre Completo" required><input name="w" class="vmax-input" placeholder="WhatsApp (52...)" required><input name="u" class="vmax-input" placeholder="Usuario" required><input name="p" type="password" class="vmax-input" placeholder="Contraseña" required><select name="pl" class="vmax-input"><option value="RZ Origen $600">RZ Origen - $600</option><option value="Membresía + Origen $1,700">Membresía + Origen - $1,700</option><option value="PQT Fundador $15,000">PQT Fundador - $15,000</option></select><input name="h" class="vmax-input" placeholder="Hash de Pago / TxID" required><textarea name="d" class="vmax-input" placeholder="Dirección Completa de Envío" required style="height:80px"></textarea><button class="vmax-btn">Enviar Inscripción</button></form></div></body></html>`);
 });
 
+app.post('/solicitar_retiro', (req, res) => {
+    if (!req.session.socioID) return res.redirect('/');
+    const monto = parseFloat(req.body.monto) || 0;
+    db.get("SELECT balance, solicitud_retiro FROM socios WHERE id = ?", [req.session.socioID], (err, s) => {
+        if (!s || s.solicitud_retiro === 'pendiente' || s.solicitud_retiro === 'liberado') return res.redirect('/dashboard');
+        const cant = Math.min(monto, s.balance || 0);
+        if (cant <= 0) return res.redirect('/dashboard');
+        db.run("UPDATE socios SET solicitud_retiro = 'pendiente', monto_solicitado = ?, detalles_retiro = ? WHERE id = ?", [cant, 'Solicitud: $' + cant.toLocaleString(), req.session.socioID], () => res.redirect('/dashboard'));
+    });
+});
+
 app.post('/reg', (req, res) => {
     const b = req.body;
     db.run("INSERT INTO socios (nombre, whatsapp, usuario, password, patrocinador_id, plan, hash_pago, direccion) VALUES (?,?,?,?,?,?,?,?)", [b.n, b.w, b.u, b.p, b.ref, b.pl, b.h, b.d], (err) => {
@@ -98,7 +110,8 @@ app.get('/dashboard', (req, res) => {
             let porc = (s.puntos / meta) * 100;
             const linkRef = `https://${req.get('host')}/registro?ref=${s.usuario}`;
             const copyScript = `<script>function copiarLink(){navigator.clipboard.writeText('${linkRef}').then(()=>{const b=document.getElementById('btnCopy');b.textContent='¡Copiado!';setTimeout(()=>b.textContent='Copiar link',1500)})}</script>`;
-            res.send(`<html>${cssOrigen}${copyScript}<body><div class="card"><h3>Bienvenido, ${s.nombre}</h3><div class="stat-grid"><div class="stat-box"><span class="val">${s.puntos.toLocaleString()}</span><span class="label">PV Acumulados</span></div><div class="stat-box"><span class="val">$${s.balance.toLocaleString()}</span><span class="label">Balance MXN</span></div></div><div class="bar-bg"><div class="bar-fill" style="width:${porc}%"></div></div><p style="text-align:center; font-size:11px; color:var(--teal)">Progreso hacia bono: ${meta.toLocaleString()} PV</p></div><div class="card"><h4>Mi Link de Referido:</h4><div class="link-cell"><input class="vmax-input" value="${linkRef}" readonly style="flex:1; margin-right:8px"><button id="btnCopy" class="copy-btn" onclick="copiarLink()">Copiar link</button></div><h4>Estructura Directa</h4><table><tr><th>Socio</th><th>Plan</th><th>Estado</th></tr>${(red||[]).map(i=>`<tr><td>${i.nombre}</td><td>${i.plan}</td><td><span class="badge ${i.estado==='activo'?'badge-active':'badge-pending'}">${i.estado}</span></td></tr>`).join('')}</table></div>${s.usuario==='ADMINRZ'?'<a href="/admin" class="vmax-btn" style="background:var(--gold); color:#000; text-decoration:none; display:block; text-align:center">Panel Administrativo</a>':''}</body></html>`);
+            const btnSolicitar = (s.balance > 0 && s.solicitud_retiro !== 'pendiente' && s.solicitud_retiro !== 'liberado') ? `<form action="/solicitar_retiro" method="POST" style="margin-top:15px"><input type="hidden" name="monto" value="${s.balance}"><button type="submit" class="vmax-btn" style="background:var(--gold); color:#000">Solicitar retiro de comisiones ($${s.balance.toLocaleString()})</button></form>` : s.solicitud_retiro === 'pendiente' ? `<p style="color:var(--gold); font-size:12px; margin-top:10px">Solicitud pendiente: $${(s.monto_solicitado||s.balance).toLocaleString()}</p>` : '';
+            res.send(`<html>${cssOrigen}${copyScript}<body><div class="card"><h3>Bienvenido, ${s.nombre}</h3><div class="stat-grid" style="grid-template-columns: repeat(3, 1fr)"><div class="stat-box"><span class="val">${s.puntos.toLocaleString()}</span><span class="label">PV Acumulados</span></div><div class="stat-box"><span class="val">$${s.balance.toLocaleString()}</span><span class="label">Balance MXN</span></div><div class="stat-box"><span class="val">$${(s.bono_cobrado||0).toLocaleString()}</span><span class="label">Bonos cobrados (total)</span></div></div><div class="bar-bg"><div class="bar-fill" style="width:${porc}%"></div></div><p style="text-align:center; font-size:11px; color:var(--teal)">Progreso hacia bono: ${meta.toLocaleString()} PV</p>${btnSolicitar}</div><div class="card"><h4>Mi Link de Referido:</h4><div class="link-cell"><input class="vmax-input" value="${linkRef}" readonly style="flex:1; margin-right:8px"><button id="btnCopy" class="copy-btn" onclick="copiarLink()">Copiar link</button></div><h4>Estructura Directa</h4><table><tr><th>Socio</th><th>Plan</th><th>Estado</th></tr>${(red||[]).map(i=>`<tr><td>${i.nombre}</td><td>${i.plan}</td><td><span class="badge ${i.estado==='activo'?'badge-active':'badge-pending'}">${i.estado}</span></td></tr>`).join('')}</table></div>${s.usuario==='ADMINRZ'?'<a href="/admin" class="vmax-btn" style="background:var(--gold); color:#000; text-decoration:none; display:block; text-align:center">Panel Administrativo</a>':''}</body></html>`);
         });
     });
 });
@@ -106,6 +119,7 @@ app.get('/dashboard', (req, res) => {
 app.get('/admin', (req, res) => {
     const host = req.get('host');
     db.all("SELECT * FROM socios ORDER BY id DESC", (err, rows) => {
+        const solicitudes = (rows || []).filter(r => r.solicitud_retiro === 'pendiente');
         const copyScript = `
         <script>
         function copiarLink(btn, url) {
@@ -116,12 +130,14 @@ app.get('/admin', (req, res) => {
             });
         }
         </script>`;
-        res.send(`<html>${cssOrigen}${copyScript}<body><div class="card" style="max-width:1100px"><h2>Control Maestro</h2><table><tr><th>Socio / WA</th><th>Plan / Hash</th><th>Dirección</th><th>Link Inscripción</th><th>Acción</th></tr>${rows.map(r=>{
+        const seccionSolicitudes = solicitudes.length > 0 ? `<div class="card" style="max-width:1100px; margin-bottom:20px; border-color:var(--gold)"><h4 style="color:var(--gold)">Solicitudes de retiro pendientes</h4><table><tr><th>Socio</th><th>Monto solicitado</th><th>Acción</th></tr>${solicitudes.map(r=>`<tr><td><b>${r.usuario}</b><br><small>${r.nombre} - ${r.whatsapp||''}</small></td><td><strong style="color:var(--cream); font-size:18px">$${(r.monto_solicitado||r.balance||0).toLocaleString()}</strong></td><td><a href="/liberar_pagos/${r.id}" style="color:var(--teal); font-weight:bold">[LIBERAR PAGOS]</a></td></tr>`).join('')}</table></div>` : '';
+        res.send(`<html>${cssOrigen}${copyScript}<body>${seccionSolicitudes}<div class="card" style="max-width:1100px"><h2>Control Maestro</h2><p style="font-size:12px; color:#aaa; margin-bottom:15px">Usuarios nuevos: validar pago (Plan/Hash) antes de activar.</p><table><tr><th>Estado</th><th>Socio / WA</th><th>Plan / Hash (validar pago)</th><th>Dirección</th><th>Solicitud retiro</th><th>Link</th><th>Acción</th></tr>${(rows||[]).map(r=>{
             const linkReg = `https://${host}/registro?ref=${r.usuario}`;
+            const solicitudCell = r.solicitud_retiro === 'pendiente' ? `<strong style="color:var(--gold)">$${(r.monto_solicitado||r.balance||0).toLocaleString()}</strong>` : r.solicitud_retiro === 'liberado' ? '<small>Liberado</small>' : '-';
             const acciones = r.estado === 'pendiente'
                 ? `<a href="/activar/${r.id}" style="color:var(--teal); font-weight:bold">[ACTIVAR]</a> | <a href="/liberar_pagos/${r.id}" style="color:var(--gold)">[LIBERAR PAGOS]</a>`
                 : `<a href="/regresar_pendiente/${r.id}" style="color:#e67e22; font-weight:bold">[REGRESAR PENDIENTE]</a> | <a href="/liberar_pagos/${r.id}" style="color:var(--gold); font-weight:bold">[LIBERAR PAGOS]</a>`;
-            return `<tr><td><b>${r.usuario}</b><br><small>${r.whatsapp||''}</small></td><td>${r.plan||''}<br><small style="color:var(--teal)">${r.hash_pago||''}</small></td><td><small>${r.direccion||''}</small></td><td><div class="link-cell"><input type="text" value="${linkReg}" readonly style="width:180px"><button class="copy-btn" onclick="copiarLink(this,'${linkReg}')">Copiar</button></div></td><td>${acciones}</td></tr>`;
+            return `<tr><td><span class="badge ${r.estado==='activo'?'badge-active':'badge-pending'}">${r.estado}</span></td><td><b>${r.usuario}</b><br><small>${r.whatsapp||''}</small></td><td>${r.plan||''}<br><small style="color:var(--teal)">${r.hash_pago||'-'}</small></td><td><small>${r.direccion||''}</small></td><td>${solicitudCell}</td><td><div class="link-cell"><input type="text" value="${linkReg}" readonly style="width:140px"><button class="copy-btn" onclick="copiarLink(this,${JSON.stringify(linkReg)})">Copiar</button></div></td><td>${acciones}</td></tr>`;
         }).join('')}</table><br><a href="/dashboard" style="color:var(--cream)">Volver al Dashboard</a></div></body></html>`);
     });
 });
