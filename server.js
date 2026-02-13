@@ -14,9 +14,8 @@ const fs = require('fs');
 const app = express();
 const port = process.env.PORT || 10000;
 
-// PERSISTENCIA DE DATOS
-const dirData = '/data';
-if (!fs.existsSync(dirData)) { fs.mkdirSync(dirData); }
+// PERSISTENCIA DE DATOS - /data es donde Render monta el Disk (1GB persistente)
+const dirData = process.env.RENDER_DISK_PATH || '/data';
 const db = new sqlite3.Database(path.join(dirData, 'raizoma_origen_final.db'));
 
 // ESTRUCTURA COMPLETA DE 16 VARIABLES
