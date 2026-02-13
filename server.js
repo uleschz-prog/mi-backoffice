@@ -7,18 +7,26 @@ const bodyParser = require('body-parser');
 const app = express();
 const port = process.env.PORT || 10000;
 
-// 1. CONEXIÓN A LA BASE DE DATOS (Persistencia en Render)
+// ==========================================
+// 1. CONFIGURACIÓN DE LA BASE DE DATOS
+// ==========================================
 const dbPath = path.join('/data', 'raizoma.db');
 const db = new sqlite3.Database(dbPath, (err) => {
     if (err) {
-        console.error("Error al abrir la base de datos:", err.message);
+        console.error("ERROR AL ABRIR LA BASE DE DATOS:");
+        console.error(err.message);
     } else {
-        console.log("Conexión exitosa a la base de datos en /data/raizoma.db");
+        console.log("-----------------------------------------");
+        console.log("CONECTADO EXITOSAMENTE: /data/raizoma.db");
+        console.log("-----------------------------------------");
     }
 });
 
-// 2. CREACIÓN Y ACTUALIZACIÓN DE TABLAS (ESTRUCTURA EXTENSA)
+// ==========================================
+// 2. ESTRUCTURA DE TABLAS Y AUTO-ADMIN
+// ==========================================
 db.serialize(() => {
+    // Creación de la tabla principal de socios
     db.run(`CREATE TABLE IF NOT EXISTS socios (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nombre TEXT,
@@ -35,110 +43,185 @@ db.serialize(() => {
         solicitud_retiro TEXT DEFAULT 'no'
     )`);
 
-    // Verificación manual de columnas (Línea por línea)
+    // Verificación y agregación de columnas necesarias una por una
     db.run("ALTER TABLE socios ADD COLUMN balance REAL DEFAULT 0", (err) => {
-        if (err) { console.log("Columna balance ya existe."); }
+        if (err) { console.log("Info: Columna balance ya existe."); }
     });
     db.run("ALTER TABLE socios ADD COLUMN puntos INTEGER DEFAULT 0", (err) => {
-        if (err) { console.log("Columna puntos ya existe."); }
+        if (err) { console.log("Info: Columna puntos ya existe."); }
     });
     db.run("ALTER TABLE socios ADD COLUMN bono_cobrado REAL DEFAULT 0", (err) => {
-        if (err) { console.log("Columna bono_cobrado ya existe."); }
+        if (err) { console.log("Info: Columna bono_cobrado ya existe."); }
     });
     db.run("ALTER TABLE socios ADD COLUMN solicitud_retiro TEXT DEFAULT 'no'", (err) => {
-        if (err) { console.log("Columna solicitud_retiro ya existe."); }
+        if (err) { console.log("Info: Columna solicitud_retiro ya existe."); }
+    });
+
+    // CREACIÓN FORZADA DEL ADMINISTRADOR SI NO EXISTE
+    const masterUser = 'ADMINRZ';
+    const masterPass = 'ROOT'; 
+
+    db.get("SELECT * FROM socios WHERE usuario = ?", [masterUser], (err, row) => {
+        if (err) {
+            console.log("Error al buscar admin:", err.message);
+        } else if (!row) {
+            console.log("CREANDO CUENTA MAESTRA ADMINRZ...");
+            db.run(`INSERT INTO socios (
+                nombre, 
+                usuario, 
+                password, 
+                estado, 
+                plan, 
+                balance, 
+                puntos
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)`, 
+            [
+                'Administrador General', 
+                masterUser, 
+                masterPass, 
+                'activo', 
+                'MASTER', 
+                0, 
+                0
+            ], (err) => {
+                if (err) {
+                    console.log("Error al insertar admin:", err.message);
+                } else {
+                    console.log("USUARIO ADMINRZ CREADO CON ÉXITO. PASS: ROOT");
+                }
+            });
+        } else {
+            console.log("EL ADMINISTRADOR YA ESTÁ CONFIGURADO EN LA DB.");
+        }
     });
 });
 
+// ==========================================
+// 3. MIDDLEWARES Y SESIONES
+// ==========================================
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(session({
-    secret: 'raizoma_secret_master_key_2026_safe_version',
+    secret: 'raizoma_ultra_secret_key_2026',
     resave: false,
     saveUninitialized: true
 }));
 
-// --- ESTILOS CSS EXTENSOS ---
-const html_header = `
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-        <style>
-            body { 
-                background-color: #0f172a; 
-                color: white; 
-                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-                padding: 20px; 
-            }
-            .card-custom { 
-                background: #1e293b; 
-                border-radius: 20px; 
-                border: 1px solid #334155; 
-                padding: 25px; 
-                margin-bottom: 25px; 
-                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            }
-            .stat-circle { 
-                width: 75px; 
-                height: 75px; 
-                border-radius: 50%; 
-                display: flex; 
-                flex-direction: column; 
-                align-items: center; 
-                justify-content: center; 
-                margin: 0 auto; 
-                border: 3px solid; 
-                background: rgba(0,0,0,0.2);
-            }
-            .stat-number {
-                font-size: 20px;
-                font-weight: bold;
-            }
-            .stat-text {
-                font-size: 9px;
-                text-transform: uppercase;
-            }
-            .btn-raizoma {
-                background: #3b82f6;
-                color: white;
-                border: none;
-                padding: 12px;
-                border-radius: 10px;
-                font-weight: bold;
-                width: 100%;
-                transition: 0.3s;
-            }
-            .btn-raizoma:hover {
-                background: #2563eb;
-            }
-        </style>
-    </head>
+// ==========================================
+// 4. DISEÑO CSS (EXTENSO)
+// ==========================================
+const css_estilos = `
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+        .contenedor-principal {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        .tarjeta {
+            background-color: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        .titulo-azul {
+            color: #3b82f6;
+            font-weight: bold;
+            text-align: center;
+        }
+        .input-raizoma {
+            background-color: #0f172a;
+            color: white;
+            border: 1px solid #334155;
+            padding: 12px;
+            border-radius: 8px;
+            width: 100%;
+            margin-bottom: 15px;
+            box-sizing: border-box;
+        }
+        .boton-primario {
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 8px;
+            width: 100%;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .boton-primario:hover {
+            background-color: #2563eb;
+        }
+        .termometro-fondo {
+            background-color: #0f172a;
+            border-radius: 20px;
+            height: 20px;
+            width: 100%;
+            border: 1px solid #334155;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+        .termometro-relleno {
+            background: linear-gradient(90deg, #3b82f6 0%, #10b981 100%);
+            height: 100%;
+            transition: width 0.5s ease;
+        }
+        .tabla-invitados {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            margin-top: 15px;
+        }
+        .tabla-invitados th {
+            text-align: left;
+            color: #94a3b8;
+            border-bottom: 1px solid #334155;
+            padding: 8px;
+        }
+        .tabla-invitados td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #1e293b;
+        }
+    </style>
 `;
 
-// --- RUTAS ---
+// ==========================================
+// 5. RUTAS DEL SISTEMA
+// ==========================================
 
-// LOGIN
+// --- VISTA DE LOGIN ---
 app.get('/', (req, res) => {
     res.send(`
         <!DOCTYPE html>
-        <html>
-        ${html_header}
-        <body class="d-flex align-items-center justify-content-center" style="height: 100vh; padding:0; margin:0;">
-            <div class="card-custom text-center" style="width: 100%; max-width: 400px;">
-                <h2 class="mb-4" style="color:#3b82f6;">🌳 Raízoma</h2>
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Login - Raízoma</title>
+            ${css_estilos}
+        </head>
+        <body style="display: flex; align-items: center; justify-content: center; min-height: 100vh;">
+            <div class="tarjeta" style="width: 100%; max-width: 380px;">
+                <h1 class="titulo-azul">🌳 Raízoma</h1>
+                <p style="text-align: center; color: #94a3b8;">Oficina Virtual</p>
                 <form action="/login" method="POST">
-                    <div class="mb-3 text-start">
-                        <label>Usuario</label>
-                        <input type="text" name="user" class="form-control" style="background:#0f172a; color:white; border:1px solid #334155;" required>
-                    </div>
-                    <div class="mb-3 text-start">
-                        <label>Contraseña</label>
-                        <input type="password" name="pass" class="form-control" style="background:#0f172a; color:white; border:1px solid #334155;" required>
-                    </div>
-                    <button type="submit" class="btn-raizoma">INICIAR SESIÓN</button>
+                    <label style="display:block; margin-bottom:5px;">Usuario</label>
+                    <input type="text" name="user" class="input-raizoma" required>
+                    
+                    <label style="display:block; margin-bottom:5px;">Contraseña</label>
+                    <input type="password" name="pass" class="input-raizoma" required>
+                    
+                    <button type="submit" class="boton-primario">ACCEDER AL SISTEMA</button>
                 </form>
-                <div class="mt-4">
-                    <a href="/registro" style="color:#94a3b8; text-decoration:none; font-size:14px;">¿Nuevo socio? Regístrate aquí</a>
+                <div style="text-align: center; margin-top: 20px;">
+                    <a href="/registro" style="color: #64748b; text-decoration: none; font-size: 14px;">¿No tienes cuenta? Regístrate</a>
                 </div>
             </div>
         </body>
@@ -146,127 +229,141 @@ app.get('/', (req, res) => {
     `);
 });
 
-// DASHBOARD (OFICINA VIRTUAL COMPLETA)
+// --- VISTA DEL DASHBOARD ---
 app.get('/dashboard', (req, res) => {
     if (!req.session.socio) {
         return res.redirect('/');
     }
+
     const s = req.session.socio;
 
-    // CONSULTA DE EQUIPO (SIN .MAP, USANDO FOR TRADICIONAL)
+    // Obtener lista de invitados para las estadísticas y la tabla
     db.all("SELECT nombre, plan, estado FROM socios WHERE patrocinador_id = ?", [s.usuario], (err, invitados) => {
-        let totales = 0;
-        let activos = 0;
-        let pendientes = 0;
-        let tablaHtml = "";
+        let n_totales = 0;
+        let n_activos = 0;
+        let filas_tabla = "";
 
         if (invitados) {
-            totales = invitados.length;
-            tablaHtml = `
-                <table class="table table-dark table-striped mt-3" style="font-size:13px; border:1px solid #334155;">
-                    <thead>
-                        <tr>
-                            <th>Socio</th>
-                            <th>Plan</th>
-                            <th>Estado</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-            
+            n_totales = invitados.length;
             for (let i = 0; i < invitados.length; i++) {
                 let inv = invitados[i];
-                let colorEstado = "#f59e0b"; // Naranja para pendiente
+                let color_est = (inv.estado === 'activo') ? "#10b981" : "#f59e0b";
                 if (inv.estado === 'activo') {
-                    activos++;
-                    colorEstado = "#10b981"; // Verde para activo
+                    n_activos++;
                 }
-                tablaHtml += `
+                filas_tabla += `
                     <tr>
                         <td>${inv.nombre}</td>
                         <td>${inv.plan}</td>
-                        <td style="color:${colorEstado}; font-weight:bold;">${inv.estado.toUpperCase()}</td>
+                        <td style="color: ${color_est}; font-weight: bold;">${inv.estado.toUpperCase()}</td>
                     </tr>
                 `;
             }
-            pendientes = totales - activos;
-            tablaHtml += `</tbody></table>`;
+        }
+
+        // Lógica del Termómetro de Rangos
+        let puntos = s.puntos || 0;
+        let meta = 100;
+        let prox_bono = 1500;
+        let porcentaje = 0;
+
+        if (puntos >= 400) {
+            meta = 400; prox_bono = 9000; porcentaje = 100;
+        } else if (puntos >= 200) {
+            meta = 400; prox_bono = 9000; porcentaje = (puntos / 400) * 100;
+        } else if (puntos >= 100) {
+            meta = 200; prox_bono = 4500; porcentaje = (puntos / 200) * 100;
         } else {
-            tablaHtml = "<p class='text-center text-secondary py-3'>No tienes invitados registrados.</p>";
+            meta = 100; prox_bono = 1500; porcentaje = (puntos / 100) * 100;
         }
 
         res.send(`
             <!DOCTYPE html>
-            <html>
-            ${html_header}
+            <html lang="es">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Dashboard - Raízoma</title>
+                ${css_estilos}
+            </head>
             <body>
-                <div class="container" style="max-width: 600px;">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h4 class="m-0">Hola, <span style="color:#3b82f6;">${s.nombre}</span></h4>
-                        <a href="/logout" class="btn btn-sm btn-outline-danger">Cerrar Sesión</a>
+                <div class="contenedor-principal">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h2 style="margin: 0;">Hola, <span style="color: #3b82f6;">${s.nombre}</span></h2>
+                        <a href="/logout" style="color: #ef4444; text-decoration: none; font-weight: bold;">Salir</a>
                     </div>
 
-                    <div class="card-custom">
-                        <label class="text-secondary small mb-2">Tu Enlace de Referido</label>
-                        <div class="d-flex gap-2">
-                            <input type="text" id="linkInvitacion" class="form-control" value="https://mi-backoffice-ra8q.onrender.com/registro?ref=${s.usuario}" readonly style="background:#0f172a; color:white; border:1px solid #334155;">
-                            <button onclick="copiarLink()" class="btn btn-primary">Copiar</button>
+                    <div class="tarjeta">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+                            <span style="font-weight: bold;">Progreso de Rango</span>
+                            <span style="color: #3b82f6; font-weight: bold;">${puntos} / ${meta} PV</span>
+                        </div>
+                        <div class="termometro-fondo">
+                            <div class="termometro-relleno" style="width: ${porcentaje}%;"></div>
+                        </div>
+                        <p style="margin-top: 10px; font-size: 13px; color: #94a3b8; text-align: center;">
+                            ${puntos >= 400 ? "¡Nivel Máximo Alcanzado!" : `Te faltan ${meta - puntos} PV para calificar al bono de $${prox_bono}`}
+                        </p>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                        <div class="tarjeta" style="margin-bottom: 0; text-align: center;">
+                            <small style="color: #94a3b8;">Balance</small>
+                            <div style="font-size: 24px; font-weight: bold; color: #3b82f6;">$${s.balance}</div>
+                        </div>
+                        <div class="tarjeta" style="margin-bottom: 0; text-align: center;">
+                            <small style="color: #94a3b8;">Puntos</small>
+                            <div style="font-size: 24px; font-weight: bold; color: #10b981;">${puntos} PV</div>
                         </div>
                     </div>
 
-                    <div class="card-custom">
-                        <p class="text-center small text-secondary mb-4">MI EQUIPO DIRECTO</p>
-                        <div class="row">
-                            <div class="col-4 text-center">
-                                <div class="stat-circle" style="border-color:#3b82f6; color:#3b82f6;">
-                                    <span class="stat-number">${totales}</span>
-                                    <span class="stat-text">Total</span>
-                                </div>
+                    <div class="tarjeta">
+                        <label style="font-size: 13px; color: #94a3b8;">Mi enlace de invitación:</label>
+                        <input type="text" id="link_ref" class="input-raizoma" value="https://mi-backoffice-ra8q.onrender.com/registro?ref=${s.usuario}" readonly style="margin-top: 5px; margin-bottom: 10px;">
+                        <button onclick="copiarLink()" class="boton-primario" style="padding: 8px;">COPIAR ENLACE</button>
+                    </div>
+
+                    <div class="tarjeta">
+                        <h4 style="margin: 0 0 15px 0; text-align: center;">Mi Equipo Directo</h4>
+                        <div style="display: flex; justify-content: space-around; margin-bottom: 15px;">
+                            <div style="text-align: center;">
+                                <div style="font-size: 18px; font-weight: bold;">${n_totales}</div>
+                                <small style="color: #94a3b8;">Registros</small>
                             </div>
-                            <div class="col-4 text-center">
-                                <div class="stat-circle" style="border-color:#10b981; color:#10b981;">
-                                    <span class="stat-number">${activos}</span>
-                                    <span class="stat-text">Activos</span>
-                                </div>
-                            </div>
-                            <div class="col-4 text-center">
-                                <div class="stat-circle" style="border-color:#f59e0b; color:#f59e0b;">
-                                    <span class="stat-number">${pendientes}</span>
-                                    <span class="stat-text">Pend.</span>
-                                </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 18px; font-weight: bold; color: #10b981;">${n_activos}</div>
+                                <small style="color: #94a3b8;">Activos</small>
                             </div>
                         </div>
-                        <div class="mt-4" style="max-height: 250px; overflow-y: auto;">
-                            ${tablaHtml}
+                        <div style="max-height: 200px; overflow-y: auto;">
+                            <table class="tabla-invitados">
+                                <thead>
+                                    <tr>
+                                        <th>Nombre</th>
+                                        <th>Plan</th>
+                                        <th>Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${filas_tabla || '<tr><td colspan="3" style="text-align:center; color:#475569;">No hay invitados aún</td></tr>'}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 
-                    <div class="card-custom" style="border-left: 5px solid #3b82f6;">
-                        <div class="row align-items-center">
-                            <div class="col-7">
-                                <small class="text-secondary">Balance de Comisiones</small>
-                                <div style="font-size: 30px; font-weight: bold; color: #3b82f6;">$${s.balance || 0}</div>
-                            </div>
-                            <div class="col-5 text-end">
-                                ${s.balance >= 500 ? `<a href="/solicitar-retiro" class="btn btn-success btn-sm w-100">RETIRAR</a>` : `<span class="badge bg-secondary">Mínimo $500</span>`}
-                            </div>
-                        </div>
-                        ${s.solicitud_retiro === 'si' ? `<p class="text-warning small text-center mt-2 mb-0">⚠️ Pago en proceso de validación...</p>` : ''}
-                    </div>
+                    ${s.balance >= 500 ? `<a href="/solicitar-retiro" class="boton-primario" style="text-decoration:none; display:block; text-align:center; margin-bottom:15px; background-color:#10b981;">RETIRAR COMISIONES</a>` : ''}
+                    
+                    ${s.usuario === 'ADMINRZ' ? `<a href="/codigo-1-panel" class="boton-primario" style="text-decoration:none; display:block; text-align:center; background-color:#f59e0b;">PANEL DE ADMINISTRACIÓN</a>` : ''}
 
-                    <div class="card-custom" style="border-left: 5px solid #10b981;">
-                        <small class="text-secondary">Puntos de Volumen (PV)</small>
-                        <div style="font-size: 26px; font-weight: bold; color: #10b981;">${s.puntos || 0} PV</div>
-                    </div>
                 </div>
 
                 <script>
                     function copiarLink() {
-                        var input = document.getElementById("linkInvitacion");
-                        input.select();
-                        input.setSelectionRange(0, 99999);
+                        var copyText = document.getElementById("link_ref");
+                        copyText.select();
+                        copyText.setSelectionRange(0, 99999);
                         document.execCommand("copy");
-                        alert("¡Enlace copiado al portapapeles!");
+                        alert("¡Enlace copiado!");
                     }
                 </script>
             </body>
@@ -275,55 +372,51 @@ app.get('/dashboard', (req, res) => {
     });
 });
 
-// REGISTRO DE NUEVOS SOCIOS
+// --- RUTA DE REGISTRO ---
 app.get('/registro', (req, res) => {
-    const patrocinador = req.query.ref || '';
+    const referido_por = req.query.ref || '';
     res.send(`
         <!DOCTYPE html>
-        <html>
-        ${html_header}
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Registro - Raízoma</title>
+            ${css_estilos}
+        </head>
         <body>
-            <div class="container" style="max-width: 500px;">
-                <div class="card-custom">
-                    <h3 class="text-center mb-4">Formulario de Inscripción</h3>
+            <div class="contenedor-principal">
+                <div class="tarjeta">
+                    <h2 class="titulo-azul">Inscripción Raízoma</h2>
                     <form action="/registro" method="POST">
-                        <input type="hidden" name="patrocinador" value="${patrocinador}">
+                        <input type="hidden" name="patrocinador" value="${referido_por}">
                         
-                        <div class="mb-3">
-                            <label>Nombre Completo</label>
-                            <input type="text" name="nombre" class="form-control" style="background:#0f172a; color:white; border:1px solid #334155;" required>
-                        </div>
+                        <label>Nombre Completo</label>
+                        <input type="text" name="nombre" class="input-raizoma" required>
                         
-                        <div class="mb-3">
-                            <label>Nombre de Usuario</label>
-                            <input type="text" name="usuario" class="form-control" style="background:#0f172a; color:white; border:1px solid #334155;" required>
-                        </div>
+                        <label>Nombre de Usuario</label>
+                        <input type="text" name="usuario" class="input-raizoma" required>
                         
-                        <div class="mb-3">
-                            <label>Contraseña</label>
-                            <input type="password" name="password" class="form-control" style="background:#0f172a; color:white; border:1px solid #334155;" required>
-                        </div>
+                        <label>Contraseña</label>
+                        <input type="password" name="password" class="input-raizoma" required>
                         
-                        <div class="mb-3">
-                            <label>Plan a Adquirir</label>
-                            <select name="plan" class="form-select" style="background:#0f172a; color:white; border:1px solid #334155;">
-                                <option value="Partner">Partner - $15,000 MXN</option>
-                                <option value="Pro">Pro - $30,000 MXN</option>
-                            </select>
-                        </div>
+                        <label>Plan de Ingreso</label>
+                        <select name="plan" class="input-raizoma" style="height: 45px;">
+                            <option value="Partner">Partner - $15,000 MXN</option>
+                            <option value="Pro">Pro - $30,000 MXN</option>
+                        </select>
                         
-                        <div class="mb-3">
-                            <label>Hash de Pago (TxID)</label>
-                            <input type="text" name="hash" class="form-control" style="background:#0f172a; color:white; border:1px solid #334155;" required>
-                        </div>
+                        <label>Hash de Pago (TxID)</label>
+                        <input type="text" name="hash" class="input-raizoma" required>
                         
-                        <div class="mb-3">
-                            <label>Dirección de Envío Completa</label>
-                            <textarea name="direccion" class="form-control" rows="3" style="background:#0f172a; color:white; border:1px solid #334155;" required></textarea>
-                        </div>
+                        <label>Dirección de Envío</label>
+                        <textarea name="direccion" class="input-raizoma" style="height: 80px;" required></textarea>
                         
-                        <button type="submit" class="btn btn-success w-100 font-weight-bold py-3">ENVIAR INSCRIPCIÓN</button>
+                        <button type="submit" class="boton-primario">ENVIAR REGISTRO</button>
                     </form>
+                    <div style="text-align: center; margin-top: 15px;">
+                        <a href="/" style="color: #94a3b8; text-decoration: none;">Volver al Login</a>
+                    </div>
                 </div>
             </div>
         </body>
@@ -331,39 +424,33 @@ app.get('/registro', (req, res) => {
     `);
 });
 
-// --- LÓGICA DE PROCESAMIENTO (DETALLADA) ---
+// --- PROCESAMIENTO DE DATOS ---
 
 app.post('/login', (req, res) => {
-    const usuarioRecibido = req.body.user;
-    const passwordRecibida = req.body.pass;
-
-    db.get("SELECT * FROM socios WHERE usuario = ? AND password = ?", [usuarioRecibido, passwordRecibida], (err, row) => {
-        if (err) {
-            console.error(err.message);
-            res.send("Error en el servidor.");
-        } else if (row) {
+    const { user, pass } = req.body;
+    db.get("SELECT * FROM socios WHERE usuario = ? AND password = ?", [user, pass], (err, row) => {
+        if (row) {
             req.session.socio = row;
             res.redirect('/dashboard');
         } else {
-            res.send("<script>alert('Datos incorrectos. Intenta de nuevo.'); window.location='/';</script>");
+            res.send("<script>alert('Usuario o clave incorrecta'); window.location='/';</script>");
         }
     });
 });
 
 app.post('/registro', (req, res) => {
     const { nombre, usuario, password, patrocinador, plan, hash, direccion } = req.body;
-
     db.run(`INSERT INTO socios (nombre, usuario, password, patrocinador_id, plan, hash_pago, direccion) VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [nombre, usuario, password, patrocinador, plan, hash, direccion],
-        function(err) {
+        (err) => {
             if (err) {
-                res.send("Error al registrar: " + err.message);
+                res.send("Error al registrar usuario: " + err.message);
             } else {
                 res.send(`
                     <body style="background:#0f172a; color:white; text-align:center; padding-top:100px; font-family:sans-serif;">
-                        <h1 style="color:#10b981;">¡Registro Exitoso!</h1>
-                        <p>Tu solicitud está en revisión. En breve activaremos tu cuenta.</p>
-                        <a href="/" style="color:#3b82f6; text-decoration:none; font-weight:bold;">Regresar al Inicio</a>
+                        <h1 style="color:#10b981;">¡Solicitud Enviada!</h1>
+                        <p>Tu cuenta será activada tras validar el pago.</p>
+                        <a href="/" style="color:#3b82f6;">Regresar al Login</a>
                     </body>
                 `);
             }
@@ -373,116 +460,99 @@ app.post('/registro', (req, res) => {
 
 app.get('/solicitar-retiro', (req, res) => {
     if (!req.session.socio) return res.redirect('/');
-    
-    db.run("UPDATE socios SET solicitud_retiro = 'si' WHERE id = ?", [req.session.socio.id], (err) => {
-        if (err) {
-            res.send("Error al procesar solicitud.");
-        } else {
-            res.send("<script>alert('Tu solicitud de retiro ha sido enviada al administrador.'); window.location='/dashboard';</script>");
-        }
+    db.run("UPDATE socios SET solicitud_retiro = 'si' WHERE id = ?", [req.session.socio.id], () => {
+        res.send("<script>alert('Solicitud de retiro enviada.'); window.location='/dashboard';</script>");
     });
 });
 
-// --- PANEL DE ADMINISTRACIÓN (VISTA EXTENSA) ---
+// --- PANEL DE ADMINISTRACIÓN ---
 app.get('/codigo-1-panel', (req, res) => {
-    db.all("SELECT * FROM socios", (err, rows) => {
-        if (err) {
-            res.send("Error al cargar socios.");
-        } else {
-            let filasTabla = "";
-            for (let j = 0; j < rows.length; j++) {
-                let r = rows[j];
-                let alertaRetiro = (r.solicitud_retiro === 'si') ? "background-color: #450a0a; color: #fca5a5; font-weight:bold;" : "";
-                
-                filasTabla += `
-                    <tr style="${alertaRetiro}">
-                        <td>${r.nombre}</td>
-                        <td>${r.usuario}</td>
-                        <td>${r.plan}</td>
-                        <td>$${r.balance}</td>
-                        <td>${r.solicitud_retiro === 'si' ? 'PAGO PENDIENTE' : 'No'}</td>
-                        <td>
-                            <a href='/aprobar-socio/${r.id}' class="btn btn-sm btn-primary">Activar</a>
-                            <a href='/marcar-pagado/${r.id}' class="btn btn-sm btn-success">Pagado</a>
-                        </td>
-                    </tr>
-                `;
-            }
+    if (!req.session.socio || req.session.socio.usuario !== 'ADMINRZ') {
+        return res.redirect('/');
+    }
 
-            res.send(`
-                <!DOCTYPE html>
-                <html>
-                ${html_header}
-                <body>
-                    <div class="container-fluid">
-                        <h2 class="mb-4">Panel Maestro de Control</h2>
-                        <table class="table table-dark table-bordered">
-                            <thead>
-                                <tr>
-                                    <th>Nombre</th>
-                                    <th>Usuario</th>
-                                    <th>Plan</th>
-                                    <th>Balance</th>
-                                    <th>Retiro</th>
-                                    <th>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${filasTabla}
-                            </tbody>
-                        </table>
-                        <a href="/dashboard" class="btn btn-secondary">Volver al Dashboard</a>
-                    </div>
-                </body>
-                </html>
-            `);
+    db.all("SELECT * FROM socios", (err, rows) => {
+        let tabla_admin = "";
+        for (let j = 0; j < rows.length; j++) {
+            let r = rows[j];
+            let estilo_fila = (r.solicitud_retiro === 'si') ? "background-color: #450a0a;" : "";
+            
+            tabla_admin += `
+                <tr style="${estilo_fila}">
+                    <td>${r.nombre}</td>
+                    <td>${r.usuario}</td>
+                    <td>${r.estado}</td>
+                    <td>$${r.balance}</td>
+                    <td>${r.solicitud_retiro === 'si' ? '<b>SÍ</b>' : 'No'}</td>
+                    <td>
+                        <a href="/aprobar-socio/${r.id}" style="color:#3b82f6;">Activar</a> | 
+                        <a href="/marcar-pagado/${r.id}" style="color:#10b981;">Pagado</a>
+                    </td>
+                </tr>
+            `;
         }
+
+        res.send(`
+            <!DOCTYPE html>
+            <html lang="es">
+            <head>
+                <meta charset="UTF-8">
+                ${css_estilos}
+            </head>
+            <body>
+                <h2>Panel Maestro Raízoma</h2>
+                <table class="tabla-invitados" style="font-size: 12px; background: #1e293b;">
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>User</th>
+                            <th>Estado</th>
+                            <th>Balance</th>
+                            <th>¿Retiro?</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tabla_admin}
+                    </tbody>
+                </table>
+                <br>
+                <a href="/dashboard" class="boton-primario" style="text-decoration:none;">Volver al Dashboard</a>
+            </body>
+            </html>
+        `);
     });
 });
 
-// LÓGICA DE APROBACIÓN CON REGLA DE BONOS (DIFERENCIA)
 app.get('/aprobar-socio/:id', (req, res) => {
-    const idSocio = req.params.id;
+    const socioId = req.params.id;
+    db.get("SELECT patrocinador_id FROM socios WHERE id = ?", [socioId], (err, s) => {
+        if (s && s.patrocinador_id) {
+            // Sumar 100 PV
+            db.run("UPDATE socios SET puntos = puntos + 100 WHERE usuario = ?", [s.patrocinador_id], () => {
+                // Calcular bono por diferencia
+                db.get("SELECT puntos, bono_cobrado FROM socios WHERE usuario = ?", [s.patrocinador_id], (err, p) => {
+                    let meta_dinero = 0;
+                    if (p.puntos >= 400) meta_dinero = 9000;
+                    else if (p.puntos >= 200) meta_dinero = 4500;
+                    else if (p.puntos >= 100) meta_dinero = 1500;
 
-    db.get("SELECT patrocinador_id FROM socios WHERE id = ?", [idSocio], (err, socioNuevo) => {
-        if (socioNuevo && socioNuevo.patrocinador_id) {
-            // 1. Sumar 100 PV al patrocinador
-            db.run("UPDATE socios SET puntos = puntos + 100 WHERE usuario = ?", [socioNuevo.patrocinador_id], () => {
-                
-                // 2. Calcular Bono por diferencia
-                db.get("SELECT puntos, bono_cobrado, balance FROM socios WHERE usuario = ?", [socioNuevo.patrocinador_id], (err, p) => {
-                    if (p) {
-                        let bonoMeta = 0;
-                        if (p.puntos >= 400) {
-                            bonoMeta = 9000;
-                        } else if (p.puntos >= 200) {
-                            bonoMeta = 4500;
-                        } else if (p.puntos >= 100) {
-                            bonoMeta = 1500;
-                        }
-
-                        let diferencia = bonoMeta - p.bono_cobrado;
-
-                        if (diferencia > 0) {
-                            db.run("UPDATE socios SET balance = balance + ?, bono_cobrado = bono_cobrado + ? WHERE usuario = ?", 
-                                [diferencia, diferencia, socioNuevo.patrocinador_id]
-                            );
-                        }
+                    let pago = meta_dinero - p.bono_cobrado;
+                    if (pago > 0) {
+                        db.run("UPDATE socios SET balance = balance + ?, bono_cobrado = bono_cobrado + ? WHERE usuario = ?", 
+                        [pago, pago, s.patrocinador_id]);
                     }
                 });
             });
         }
-        
-        // 3. Activar al socio
-        db.run("UPDATE socios SET estado = 'activo' WHERE id = ?", [idSocio], () => {
+        db.run("UPDATE socios SET estado = 'activo' WHERE id = ?", [socioId], () => {
             res.redirect('/codigo-1-panel');
         });
     });
 });
 
 app.get('/marcar-pagado/:id', (req, res) => {
-    const idRetiro = req.params.id;
-    db.run("UPDATE socios SET solicitud_retiro = 'no', balance = 0 WHERE id = ?", [idRetiro], () => {
+    db.run("UPDATE socios SET solicitud_retiro = 'no', balance = 0 WHERE id = ?", [req.params.id], () => {
         res.redirect('/codigo-1-panel');
     });
 });
@@ -492,9 +562,8 @@ app.get('/logout', (req, res) => {
     res.redirect('/');
 });
 
-// INICIO DEL SERVIDOR
 app.listen(port, () => {
-    console.log("-----------------------------------------");
-    console.log(`SERVIDOR RAÍZOMA V.SAFE CORRIENDO EN PUERTO ${port}`);
-    console.log("-----------------------------------------");
+    console.log("=========================================");
+    console.log(`SISTEMA RAÍZOMA V.MAX CORRIENDO EN PORT ${port}`);
+    console.log("=========================================");
 });
