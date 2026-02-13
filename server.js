@@ -1,10 +1,6 @@
 /**
- * SISTEMA RAIZOMA PRO - CÓDIGO MAESTRO DE LANZAMIENTO
- * ---------------------------------------------------
- * Variables integradas: 
- * - Wallet: TA4wCKDm2kNzPbJWA51CLrUAGqQcPbdtUw
- * - Bonos: 10% ($15k), 15% ($30k), 20% (Real > $60k)
- * - Logística: Captura de Dirección de Envío
+ * RAIZOMA CORE SYSTEM v3.0 - LANZAMIENTO
+ * Diseñado para: Ulises | Wallet: TA4wCKDm2kNzPbJWA51CLrUAGqQcPbdtUw
  */
 
 const express = require('express');
@@ -15,11 +11,10 @@ const app = express();
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// 1. BASE DE DATOS (Compatible con Render y Local)
+// BASE DE DATOS (Configuración para persistencia en Render)
 const dbPath = process.env.NODE_ENV === 'production' 
-    ? '/var/lib/data/raizoma_oficial.db' 
-    : path.join(__dirname, 'raizoma_oficial.db');
-
+    ? '/var/lib/data/negocio_raizoma.db' 
+    : path.join(__dirname, 'negocio_raizoma.db');
 const db = new sqlite3.Database(dbPath);
 
 db.serialize(() => {
@@ -27,117 +22,130 @@ db.serialize(() => {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nombre TEXT,
         direccion TEXT,
-        volumen_red INTEGER DEFAULT 0,
+        volumen_red REAL DEFAULT 0,
+        hash_pago TEXT,
         fecha_reg DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 });
 
-// 2. MOTOR DE CÁLCULO DE COMISIONES (Lógica exacta de diapositivas)
-function calcularComision(vol) {
-    if (vol >= 60000) return { monto: vol * 0.20, rango: 'Senior Managing Partner', pct: '20%' };
-    if (vol >= 30000) return { monto: 4500, rango: 'Director Partner', pct: '15% (Fijo)' };
-    if (vol >= 15000) return { monto: 1500, rango: 'Asociado Partner', pct: '10% (Fijo)' };
-    return { monto: 0, rango: 'Socio Activo', pct: '0%' };
+// MOTOR DE CÁLCULO DE COMISIONES (Basado en PDF Raízoma)
+function calcularComisiones(vol) {
+    let pago = 0;
+    let rango = "Socio Activo";
+    
+    if (vol >= 60000) {
+        pago = vol * 0.20; // 20% Real a partir de 60k
+        rango = "Senior Managing Partner";
+    } else if (vol >= 30000) {
+        pago = 4500; // 15% de 30k (Fijo)
+        rango = "Director Partner";
+    } else if (vol >= 15000) {
+        pago = 1500; // 10% de 15k (Fijo)
+        rango = "Asociado Partner";
+    }
+    
+    return { pago, rango };
 }
 
-// 3. VISTA: CUENTA MADRE (DASHBOARD)
+// RUTA 1: CUENTA MADRE (DASHBOARD)
 app.get('/', (req, res) => {
     db.all("SELECT * FROM socios ORDER BY id DESC", (err, rows) => {
         res.send(`
         <!DOCTYPE html>
-        <html>
+        <html lang="es">
         <head>
-            <title>Raízoma | Panel de Control</title>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Raízoma | Cuenta Madre</title>
             <style>
-                body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; margin: 0; padding: 20px; }
-                .main-card { max-width: 1000px; margin: auto; background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
-                .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f0f2f5; padding-bottom: 20px; margin-bottom: 20px; }
-                .btn { background: #1a237e; color: white; padding: 12px 25px; border-radius: 10px; text-decoration: none; font-weight: bold; }
-                table { width: 100%; border-collapse: collapse; }
-                th { text-align: left; color: #64748b; font-size: 13px; padding: 10px; background: #f8fafc; }
-                td { padding: 15px 10px; border-bottom: 1px solid #f1f5f9; }
-                .tag { padding: 4px 8px; border-radius: 5px; font-size: 11px; font-weight: bold; background: #e0e7ff; color: #3730a3; }
-                .comision-text { color: #10b981; font-weight: bold; font-size: 18px; }
+                :root { --blue: #1a237e; --green: #10b981; --gray: #64748b; }
+                body { font-family: 'Segoe UI', sans-serif; background: #f8fafc; margin: 0; padding: 20px; color: #1e293b; }
+                .container { max-width: 1100px; margin: auto; }
+                .header { background: var(--blue); color: white; padding: 30px; border-radius: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+                .btn { background: var(--green); color: white; padding: 12px 24px; border-radius: 12px; text-decoration: none; font-weight: bold; border: none; cursor: pointer; }
+                .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; margin-top: 30px; }
+                .card { background: white; padding: 20px; border-radius: 15px; border: 1px solid #e2e8f0; transition: transform 0.2s; }
+                .card:hover { transform: translateY(-5px); }
+                .rango { font-size: 11px; font-weight: bold; color: var(--blue); text-transform: uppercase; background: #e0e7ff; padding: 4px 8px; border-radius: 5px; }
+                .pago { font-size: 24px; font-weight: bold; color: var(--green); margin: 10px 0; }
+                .details { font-size: 13px; color: var(--gray); line-height: 1.5; }
             </style>
         </head>
         <body>
-            <div class="main-card">
+            <div class="container">
                 <div class="header">
-                    <h1 style="color: #1a237e; margin: 0;">Raízoma: Gestión de Red</h1>
-                    <a href="/unete" class="btn">+ Registrar Socio</a>
+                    <div>
+                        <h1 style="margin:0;">Raízoma Core</h1>
+                        <p style="margin:5px 0 0; opacity:0.8;">Panel General de Administración</p>
+                    </div>
+                    <a href="/unete" class="btn">Registrar Nuevo Socio</a>
                 </div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>DATOS DEL SOCIO / LOGÍSTICA</th>
-                            <th>VOLUMEN MENSUAL</th>
-                            <th>ESTADO / COMISIÓN</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${rows.map(s => {
-                            const info = calcularComision(s.volumen_red);
-                            return `
-                            <tr>
-                                <td>
-                                    <span class="tag">${info.rango}</span><br>
-                                    <div style="margin-top:8px;"><b>${s.nombre}</b></div>
-                                    <div style="font-size:12px; color:#64748b; margin-top:4px;">📍 ${s.direccion}</div>
-                                </td>
-                                <td style="font-weight:bold; font-size:18px; color:#1a237e;">$${s.volumen_red.toLocaleString()}</td>
-                                <td>
-                                    <small style="color:#64748b;">Bono Gestión ${info.pct}</small><br>
-                                    <span class="comision-text">$${info.monto.toLocaleString()}</span>
-                                </td>
-                            </tr>`;
-                        }).join('') || '<tr><td colspan="3" style="text-align:center; padding:50px; color:#94a3b8;">No hay registros todavía.</td></tr>'}
-                    </tbody>
-                </table>
+
+                <div class="grid">
+                    ${rows.map(s => {
+                        const { pago, rango } = calcularComisiones(s.volumen_red);
+                        return `
+                        <div class="card">
+                            <span class="rango">${rango}</span>
+                            <h3 style="margin:15px 0 5px;">${s.nombre}</h3>
+                            <div class="pago">$${pago.toLocaleString()} <small style="font-size:12px; color:gray;">Bono Gestión</small></div>
+                            <div class="details">
+                                <b>Volumen:</b> $${s.volumen_red.toLocaleString()}<br>
+                                <b>Logística:</b> ${s.direccion}<br>
+                                <b>Hash:</b> <code style="font-size:10px;">${s.hash_pago}</code>
+                            </div>
+                        </div>`;
+                    }).join('') || '<p>No hay socios registrados aún.</p>'}
+                </div>
             </div>
         </body>
-        </html>`);
+        </html>
+        `);
     });
 });
 
-// 4. VISTA: FORMULARIO DE REGISTRO
+// RUTA 2: FORMULARIO DE REGISTRO
 app.get('/unete', (req, res) => {
     res.send(`
     <html>
     <head>
+        <meta charset="UTF-8">
         <style>
-            body { font-family: sans-serif; background: #1a237e; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-            .form-box { background: white; padding: 40px; border-radius: 20px; width: 400px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
-            input, textarea { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
-            .wallet-info { background: #f0fdf4; border: 1px dashed #22c55e; padding: 15px; border-radius: 10px; font-size: 12px; margin: 15px 0; }
-            button { width: 100%; background: #2ecc71; color: white; border: none; padding: 15px; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 16px; }
+            body { font-family: sans-serif; background: #1a237e; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+            .box { background: white; padding: 40px; border-radius: 25px; width: 100%; max-width: 400px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
+            input, textarea { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #d1d5db; border-radius: 10px; box-sizing: border-box; }
+            .wallet { background: #ecfdf5; border: 2px dashed #10b981; padding: 15px; border-radius: 12px; font-size: 12px; margin: 15px 0; word-break: break-all; }
+            button { width: 100%; padding: 16px; background: #10b981; color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 16px; }
         </style>
     </head>
     <body>
-        <div class="form-box">
-            <h2 style="color: #1a237e; text-align: center; margin-bottom: 25px;">Registro de Socio</h2>
-            <form action="/procesar" method="POST">
-                <input name="n" placeholder="Nombre Completo" required>
-                <textarea name="d" placeholder="Dirección de Envío Completa (Calle, CP, Ciudad)" required rows="3"></textarea>
-                <div class="wallet-info">
-                    <b>ENVIAR USDT (TRC20) A:</b><br>
+        <div class="box">
+            <h2 style="text-align:center; color:#1a237e; margin-top:0;">Registro Raízoma</h2>
+            <form action="/enviar" method="POST">
+                <input name="nombre" placeholder="Nombre completo" required>
+                <textarea name="direccion" placeholder="Dirección de envío completa (Calle, CP, Ciudad)" required rows="3"></textarea>
+                
+                <div class="wallet">
+                    <b>ENVÍA USDT (TRC20) A:</b><br>
                     TA4wCKDm2kNzPbJWA51CLrUAGqQcPbdtUw
                 </div>
-                <input name="v" type="number" placeholder="Monto de Inversión / Volumen ($)" required>
-                <button type="submit">ACTIVAR SOCIO</button>
+
+                <input name="volumen" type="number" placeholder="Monto enviado ($)" required>
+                <input name="hash" placeholder="Hash de transacción (TXID)" required>
+                <button type="submit">NOTIFICAR PAGO</button>
             </form>
         </div>
     </body>
-    </html>`);
+    </html>
+    `);
 });
 
-// 5. PROCESAMIENTO DE DATOS
-app.post('/procesar', (req, res) => {
-    const { n, d, v } = req.body;
-    db.run("INSERT INTO socios (nombre, direccion, volumen_red) VALUES (?,?,?)", [n, d, v], () => {
-        res.redirect('/');
-    });
+app.post('/enviar', (req, res) => {
+    const { nombre, direccion, volumen, hash } = req.body;
+    db.run("INSERT INTO socios (nombre, direccion, volumen_red, hash_pago) VALUES (?,?,?,?)", 
+    [nombre, direccion, volumen, hash], () => res.redirect('/'));
 });
 
-// 6. ARRANQUE (Compatible con el puerto de Render)
+// PUERTO DINÁMICO
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`Raízoma en línea: puerto ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`Raízoma operando en puerto ${PORT}`));
