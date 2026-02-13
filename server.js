@@ -59,6 +59,10 @@ const cssOrigen = `<style>
     .badge { padding: 4px 8px; border-radius: 5px; font-size: 10px; font-weight: bold; }
     .badge-active { background: var(--teal); color: var(--dark); }
     .badge-pending { background: #444; color: #aaa; }
+    .copy-btn { background: var(--teal); color: var(--dark); border: none; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: bold; margin-left: 5px; }
+    .copy-btn:hover { background: var(--cream); }
+    .link-cell { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+    .link-cell input { flex: 1; min-width: 120px; padding: 6px 10px; font-size: 11px; }
 </style>`;
 
 // RUTAS LÓGICAS
@@ -75,7 +79,8 @@ app.post('/login', (req, res) => {
 
 app.get('/registro', (req, res) => {
     const ref = req.query.ref || '';
-    res.send(`<html>${cssOrigen}<body><div class="card"><h2>Registro Origen</h2><form action="/reg" method="POST"><input type="hidden" name="ref" value="${ref}"><input name="n" class="vmax-input" placeholder="Nombre Completo" required><input name="w" class="vmax-input" placeholder="WhatsApp (52...)" required><input name="u" class="vmax-input" placeholder="Usuario" required><input name="p" type="password" class="vmax-input" placeholder="Contraseña" required><select name="pl" class="vmax-input"><option value="RZ Origen $600">RZ Origen - $600</option><option value="Membresía + Origen $1,700">Membresía + Origen - $1,700</option><option value="PQT Fundador $15,000">PQT Fundador - $15,000</option></select><input name="h" class="vmax-input" placeholder="Hash de Pago / TxID" required><textarea name="d" class="vmax-input" placeholder="Dirección Completa de Envío" required style="height:80px"></textarea><button class="vmax-btn">Enviar Inscripción</button></form></div></body></html>`);
+    const msgPatrocinador = ref ? `<p style="text-align:center; color:var(--teal); font-weight:bold; margin-bottom:15px">Patrocinador: <strong>${ref}</strong></p>` : '';
+    res.send(`<html>${cssOrigen}<body><div class="card"><h2>Registro Origen</h2>${msgPatrocinador}<form action="/reg" method="POST"><input type="hidden" name="ref" value="${ref}"><input name="n" class="vmax-input" placeholder="Nombre Completo" required><input name="w" class="vmax-input" placeholder="WhatsApp (52...)" required><input name="u" class="vmax-input" placeholder="Usuario" required><input name="p" type="password" class="vmax-input" placeholder="Contraseña" required><select name="pl" class="vmax-input"><option value="RZ Origen $600">RZ Origen - $600</option><option value="Membresía + Origen $1,700">Membresía + Origen - $1,700</option><option value="PQT Fundador $15,000">PQT Fundador - $15,000</option></select><input name="h" class="vmax-input" placeholder="Hash de Pago / TxID" required><textarea name="d" class="vmax-input" placeholder="Dirección Completa de Envío" required style="height:80px"></textarea><button class="vmax-btn">Enviar Inscripción</button></form></div></body></html>`);
 });
 
 app.post('/reg', (req, res) => {
@@ -92,14 +97,33 @@ app.get('/dashboard', (req, res) => {
         db.all("SELECT * FROM socios WHERE patrocinador_id = ?", [s.usuario], (err, red) => {
             let meta = s.puntos >= 60000 ? 60000 : (s.puntos >= 30000 ? 60000 : (s.puntos >= 15000 ? 30000 : 15000));
             let porc = (s.puntos / meta) * 100;
-            res.send(`<html>${cssOrigen}<body><div class="card"><h3>Bienvenido, ${s.nombre}</h3><div class="stat-grid"><div class="stat-box"><span class="val">${s.puntos.toLocaleString()}</span><span class="label">PV Acumulados</span></div><div class="stat-box"><span class="val">$${s.balance.toLocaleString()}</span><span class="label">Balance MXN</span></div></div><div class="bar-bg"><div class="bar-fill" style="width:${porc}%"></div></div><p style="text-align:center; font-size:11px; color:var(--teal)">Progreso hacia bono: ${meta.toLocaleString()} PV</p></div><div class="card"><h4>Mi Link de Referido:</h4><input class="vmax-input" value="https://${req.get('host')}/registro?ref=${s.usuario}" readonly onclick="this.select(); document.execCommand('copy'); alert('Copiado');"><h4>Estructura Directa</h4><table><tr><th>Socio</th><th>Plan</th><th>Estado</th></tr>${red.map(i=>`<tr><td>${i.nombre}</td><td>${i.plan}</td><td><span class="badge ${i.estado==='activo'?'badge-active':'badge-pending'}">${i.estado}</span></td></tr>`).join('')}</table></div>${s.usuario==='ADMINRZ'?'<a href="/admin" class="vmax-btn" style="background:var(--gold); color:#000; text-decoration:none; display:block; text-align:center">Panel Administrativo</a>':''}</body></html>`);
+            const linkRef = `https://${req.get('host')}/registro?ref=${s.usuario}`;
+            const copyScript = `<script>function copiarLink(){navigator.clipboard.writeText('${linkRef}').then(()=>{const b=document.getElementById('btnCopy');b.textContent='¡Copiado!';setTimeout(()=>b.textContent='Copiar link',1500)})}</script>`;
+            res.send(`<html>${cssOrigen}${copyScript}<body><div class="card"><h3>Bienvenido, ${s.nombre}</h3><div class="stat-grid"><div class="stat-box"><span class="val">${s.puntos.toLocaleString()}</span><span class="label">PV Acumulados</span></div><div class="stat-box"><span class="val">$${s.balance.toLocaleString()}</span><span class="label">Balance MXN</span></div></div><div class="bar-bg"><div class="bar-fill" style="width:${porc}%"></div></div><p style="text-align:center; font-size:11px; color:var(--teal)">Progreso hacia bono: ${meta.toLocaleString()} PV</p></div><div class="card"><h4>Mi Link de Referido:</h4><div class="link-cell"><input class="vmax-input" value="${linkRef}" readonly style="flex:1; margin-right:8px"><button id="btnCopy" class="copy-btn" onclick="copiarLink()">Copiar link</button></div><h4>Estructura Directa</h4><table><tr><th>Socio</th><th>Plan</th><th>Estado</th></tr>${(red||[]).map(i=>`<tr><td>${i.nombre}</td><td>${i.plan}</td><td><span class="badge ${i.estado==='activo'?'badge-active':'badge-pending'}">${i.estado}</span></td></tr>`).join('')}</table></div>${s.usuario==='ADMINRZ'?'<a href="/admin" class="vmax-btn" style="background:var(--gold); color:#000; text-decoration:none; display:block; text-align:center">Panel Administrativo</a>':''}</body></html>`);
         });
     });
 });
 
 app.get('/admin', (req, res) => {
+    const host = req.get('host');
     db.all("SELECT * FROM socios ORDER BY id DESC", (err, rows) => {
-        res.send(`<html>${cssOrigen}<body><div class="card" style="max-width:950px"><h2>Control Maestro</h2><table><tr><th>Socio / WA</th><th>Plan / Hash</th><th>Dirección</th><th>Acción</th></tr>${rows.map(r=>`<tr><td><b>${r.usuario}</b><br><small>${r.whatsapp}</small></td><td>${r.plan}<br><small style="color:var(--teal)">${r.hash_pago}</small></td><td><small>${r.direccion}</small></td><td><a href="/activar/${r.id}" style="color:var(--teal); font-weight:bold">[ACTIVAR]</a></td></tr>`).join('')}</table><br><a href="/dashboard" style="color:var(--cream)">Volver al Dashboard</a></div></body></html>`);
+        const copyScript = `
+        <script>
+        function copiarLink(btn, url) {
+            navigator.clipboard.writeText(url).then(() => {
+                const orig = btn.textContent;
+                btn.textContent = '¡Copiado!';
+                setTimeout(() => btn.textContent = orig, 1500);
+            });
+        }
+        </script>`;
+        res.send(`<html>${cssOrigen}${copyScript}<body><div class="card" style="max-width:1100px"><h2>Control Maestro</h2><table><tr><th>Socio / WA</th><th>Plan / Hash</th><th>Dirección</th><th>Link Inscripción</th><th>Acción</th></tr>${rows.map(r=>{
+            const linkReg = `https://${host}/registro?ref=${r.usuario}`;
+            const acciones = r.estado === 'pendiente'
+                ? `<a href="/activar/${r.id}" style="color:var(--teal); font-weight:bold">[ACTIVAR]</a> | <a href="/liberar_pagos/${r.id}" style="color:var(--gold)">[LIBERAR PAGOS]</a>`
+                : `<a href="/regresar_pendiente/${r.id}" style="color:#e67e22; font-weight:bold">[REGRESAR PENDIENTE]</a> | <a href="/liberar_pagos/${r.id}" style="color:var(--gold); font-weight:bold">[LIBERAR PAGOS]</a>`;
+            return `<tr><td><b>${r.usuario}</b><br><small>${r.whatsapp||''}</small></td><td>${r.plan||''}<br><small style="color:var(--teal)">${r.hash_pago||''}</small></td><td><small>${r.direccion||''}</small></td><td><div class="link-cell"><input type="text" value="${linkReg}" readonly style="width:180px"><button class="copy-btn" onclick="copiarLink(this,'${linkReg}')">Copiar</button></div></td><td>${acciones}</td></tr>`;
+        }).join('')}</table><br><a href="/dashboard" style="color:var(--cream)">Volver al Dashboard</a></div></body></html>`);
     });
 });
 
@@ -119,6 +143,22 @@ app.get('/activar/:id', (req, res) => {
                 }
                 res.redirect('/admin');
             });
+        } else res.redirect('/admin');
+    });
+});
+
+app.get('/regresar_pendiente/:id', (req, res) => {
+    db.get("SELECT * FROM socios WHERE id = ?", [req.params.id], (err, s) => {
+        if (s && s.estado === 'activo') {
+            db.run("UPDATE socios SET estado = 'pendiente' WHERE id = ?", [req.params.id], () => res.redirect('/admin'));
+        } else res.redirect('/admin');
+    });
+});
+
+app.get('/liberar_pagos/:id', (req, res) => {
+    db.get("SELECT * FROM socios WHERE id = ?", [req.params.id], (err, s) => {
+        if (s) {
+            db.run("UPDATE socios SET solicitud_retiro = 'liberado', detalles_retiro = 'Pagos liberados por admin' WHERE id = ?", [req.params.id], () => res.redirect('/admin'));
         } else res.redirect('/admin');
     });
 });
