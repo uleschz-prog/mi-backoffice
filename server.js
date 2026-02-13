@@ -7,14 +7,14 @@ const bodyParser = require('body-parser');
 const app = express();
 const port = process.env.PORT || 10000;
 
-// 1. CONEXIÓN A LA BASE DE DATOS (Ruta persistente en Render)
+// 1. CONEXIÓN A LA BASE DE DATOS
 const dbPath = path.join('/data', 'raizoma.db');
 const db = new sqlite3.Database(dbPath, (err) => {
     if (err) console.error("Error al abrir DB:", err.message);
-    else console.log("Conexión exitosa a /data/raizoma.db");
+    else console.log("Conectado exitosamente a /data/raizoma.db");
 });
 
-// 2. ESTRUCTURA DE TABLA (Aseguramos que no falte ninguna columna de tus capturas)
+// 2. CREACIÓN Y ACTUALIZACIÓN DE TABLAS
 db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS socios (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -30,125 +30,179 @@ db.serialize(() => {
         puntos INTEGER DEFAULT 0
     )`);
 
-    // Verificación de seguridad: Agregar columna puntos si no existe por alguna actualización previa
     db.run("ALTER TABLE socios ADD COLUMN puntos INTEGER DEFAULT 0", (err) => {
-        if (err) console.log("La columna 'puntos' ya está integrada.");
+        if (err) console.log("La columna puntos ya existe.");
     });
 });
 
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(session({
-    secret: 'raizoma_master_ultra_secret_2026',
+    secret: 'raizoma_secret_master_key_2026',
     resave: false,
     saveUninitialized: true
 }));
 
-// --- INTERFAZ VISUAL (HTML & CSS UNIFICADO) ---
-const header = `
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body { background-color: #0f172a; color: white; font-family: 'Segoe UI', sans-serif; }
-        .raizoma-card { background: #1e293b; border-radius: 20px; border: 1px solid #334155; padding: 25px; margin-bottom: 20px; }
-        .btn-raizoma { background: #3b82f6; border: none; padding: 12px; font-weight: bold; border-radius: 10px; color: white; width: 100%; }
-        .btn-raizoma:hover { background: #2563eb; }
-        .input-raizoma { background: #0f172a !important; color: white !important; border: 1px solid #334155 !important; margin-bottom: 15px; }
-        .pv-count { font-size: 32px; font-weight: bold; color: #10b981; }
-    </style>
-`;
+// --- RUTAS DEL SISTEMA ---
 
-// --- RUTAS ---
-
-// 1. LOGIN
+// LOGIN PRINCIPAL
 app.get('/', (req, res) => {
     res.send(`
-        <!DOCTYPE html><html><head>${header}<title>Login - Raízoma</title></head>
-        <body class="d-flex align-items-center" style="height:100vh;">
-            <div class="container" style="max-width:400px;">
-                <div class="raizoma-card text-center">
-                    <h2 class="mb-4">🌳 Raízoma</h2>
-                    <form action="/login" method="POST">
-                        <input type="text" name="user" class="form-control input-raizoma" placeholder="Usuario" required>
-                        <input type="password" name="pass" class="form-control input-raizoma" placeholder="Contraseña" required>
-                        <button type="submit" class="btn-raizoma">INICIAR SESIÓN</button>
-                    </form>
-                    <p class="mt-3"><a href="/registro" class="text-secondary text-decoration-none small">¿Nuevo socio? Regístrate aquí</a></p>
-                </div>
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Login - Raízoma</title>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+            <style>
+                body { background-color: #0f172a; color: white; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+                .login-card { background: #1e293b; padding: 30px; border-radius: 20px; border: 1px solid #334155; width: 100%; max-width: 400px; }
+            </style>
+        </head>
+        <body>
+            <div class="login-card text-center">
+                <h2 class="mb-4" style="color:#3b82f6;">🌳 Raízoma</h2>
+                <form action="/login" method="POST">
+                    <input type="text" name="user" class="form-control mb-3" placeholder="Usuario" style="background:#0f172a; color:white; border:1px solid #334155;" required>
+                    <input type="password" name="pass" class="form-control mb-3" placeholder="Contraseña" style="background:#0f172a; color:white; border:1px solid #334155;" required>
+                    <button type="submit" class="btn btn-primary w-100" style="background:#3b82f6; border:none; font-weight:bold;">ENTRAR</button>
+                </form>
+                <p class="mt-3 small"><a href="/registro" style="color:#94a3b8; text-decoration:none;">¿No tienes cuenta? Regístrate aquí</a></p>
             </div>
-        </body></html>
+        </body>
+        </html>
     `);
 });
 
-// 2. DASHBOARD (TU OFICINA)
+// DASHBOARD CON RED (OPCIÓN B)
 app.get('/dashboard', (req, res) => {
     if (!req.session.socio) return res.redirect('/');
     const s = req.session.socio;
 
-    res.send(`
-        <!DOCTYPE html><html><head>${header}<title>Dashboard - Raízoma</title></head>
-        <body class="p-3">
-            <div class="container" style="max-width:500px;">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h4 class="m-0">Hola, <span class="text-info">${s.nombre}</span></h4>
-                    <a href="/logout" class="btn btn-sm btn-outline-danger">Salir</a>
-                </div>
+    // Lógica para obtener datos de la red antes de mostrar el HTML
+    db.all("SELECT estado FROM socios WHERE patrocinador_id = ?", [s.usuario], (err, invitados) => {
+        const totales = invitados ? invitados.length : 0;
+        const activos = invitados ? invitados.filter(i => i.estado === 'activo').length : 0;
+        const pendientes = totales - activos;
 
-                <div class="raizoma-card">
-                    <label class="text-secondary small">Mi Link de Invitación</label>
-                    <input type="text" id="link" class="form-control input-raizoma mt-2" value="https://mi-backoffice-ra8q.onrender.com/registro?ref=${s.usuario}" readonly>
-                    <button onclick="copy()" class="btn-raizoma">COPIAR ENLACE</button>
-                </div>
+        res.send(`
+            <!DOCTYPE html>
+            <html lang="es">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Backoffice - Raízoma</title>
+                <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+                <style>
+                    body { background-color: #0f172a; color: white; font-family: sans-serif; padding: 20px; }
+                    .card-custom { background: #1e293b; border-radius: 15px; border: 1px solid #334155; padding: 20px; margin-bottom: 20px; }
+                    .stat-circle { width: 70px; height: 70px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; margin: auto; border: 3px solid; }
+                </style>
+            </head>
+            <body>
+                <div class="container" style="max-width: 500px;">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h2 class="m-0">Hola, <span style="color:#3b82f6;">${s.nombre}</span></h2>
+                        <a href="/logout" class="btn btn-sm btn-outline-danger">Salir</a>
+                    </div>
 
-                <div class="raizoma-card" style="border-left: 5px solid #10b981;">
-                    <label class="text-secondary small">Puntos de Volumen (PV)</label>
-                    <div class="pv-count">${s.puntos || 0} PV</div>
-                    <div class="small">Estatus: <span class="${s.estado === 'activo' ? 'text-success' : 'text-warning'}">${s.estado.toUpperCase()}</span></div>
-                </div>
+                    <div class="card-custom text-center">
+                        <small style="color:#94a3b8;">Tu Enlace de Invitación</small>
+                        <input type="text" id="link" class="form-control my-2 text-center" value="https://mi-backoffice-ra8q.onrender.com/registro?ref=${s.usuario}" readonly style="background:#0f172a; color:white; border:1px solid #334155;">
+                        <button onclick="copy()" class="btn btn-primary w-100" style="background:#3b82f6; border:none; font-weight:bold;">Copiar Link</button>
+                    </div>
 
-                <div class="raizoma-card" style="border-left: 5px solid #3b82f6;">
-                    <label class="text-secondary small">Comisiones Totales</label>
-                    <div class="pv-count text-info">$${s.balance || 0}</div>
-                    <small class="text-secondary text-uppercase" style="font-size:10px;">Corte al día de hoy</small>
+                    <div class="card-custom">
+                        <p class="text-center small mb-3" style="color:#94a3b8;">MI EQUIPO DIRECTO</p>
+                        <div class="row">
+                            <div class="col-4 text-center">
+                                <div class="stat-circle" style="border-color:#3b82f6; color:#3b82f6;">
+                                    <b style="font-size:18px;">${totales}</b>
+                                    <span style="font-size:9px;">TOTAL</span>
+                                </div>
+                            </div>
+                            <div class="col-4 text-center">
+                                <div class="stat-circle" style="border-color:#10b981; color:#10b981;">
+                                    <b style="font-size:18px;">${activos}</b>
+                                    <span style="font-size:9px;">ACTIVOS</span>
+                                </div>
+                            </div>
+                            <div class="col-4 text-center">
+                                <div class="stat-circle" style="border-color:#f59e0b; color:#f59e0b;">
+                                    <b style="font-size:18px;">${pendientes}</b>
+                                    <span style="font-size:9px;">PEND.</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card-custom" style="border-left: 5px solid #10b981;">
+                        <small style="color:#94a3b8;">Puntos de Volumen (PV)</small>
+                        <div style="font-size:28px; font-weight:bold; color:#10b981;">${s.puntos || 0} PV</div>
+                        <small>Estado: <span style="color:${s.estado === 'activo' ? '#10b981' : '#f59e0b'}">${s.estado.toUpperCase()}</span></small>
+                    </div>
+
+                    <div class="card-custom" style="border-left: 5px solid #3b82f6;">
+                        <small style="color:#94a3b8;">Comisiones Totales</small>
+                        <div style="font-size:32px; font-weight:bold; color:#3b82f6;">$${s.balance || 0}</div>
+                    </div>
                 </div>
-            </div>
-            <script>function copy(){ var c=document.getElementById('link'); c.select(); document.execCommand('copy'); alert('¡Enlace copiado con éxito!'); }</script>
-        </body></html>
-    `);
+                <script>
+                    function copy() {
+                        var copyText = document.getElementById("link");
+                        copyText.select();
+                        document.execCommand("copy");
+                        alert("¡Enlace copiado!");
+                    }
+                </script>
+            </body>
+            </html>
+        `);
+    });
 });
 
-// 3. REGISTRO (CON TODOS LOS CAMPOS DE TU CAPTURA)
+// REGISTRO COMPLETO (TODOS LOS CAMPOS)
 app.get('/registro', (req, res) => {
     const ref = req.query.ref || '';
     res.send(`
-        <!DOCTYPE html><html><head>${header}<title>Registro - Raízoma</title></head>
-        <body class="p-3">
-            <div class="container" style="max-width:500px;">
-                <div class="raizoma-card">
-                    <h3 class="text-center mb-4">Nueva Inscripción</h3>
-                    <form action="/registro" method="POST">
-                        <input type="hidden" name="patrocinador" value="${ref}">
-                        <div class="mb-3"><label>Nombre Completo</label><input type="text" name="nombre" class="form-control input-raizoma" required></div>
-                        <div class="mb-3"><label>Nombre de Usuario</label><input type="text" name="usuario" class="form-control input-raizoma" required></div>
-                        <div class="mb-3"><label>Contraseña</label><input type="password" name="password" class="form-control input-raizoma" required></div>
-                        <div class="mb-3"><label>Plan de Ingreso</label>
-                            <select name="plan" class="form-select input-raizoma">
-                                <option value="Partner">Partner - $15,000 MXN</option>
-                                <option value="Pro">Pro - $30,000 MXN</option>
-                            </select>
-                        </div>
-                        <div class="mb-3"><label>Hash de Pago (TxID)</label><input type="text" name="hash" class="form-control input-raizoma" required></div>
-                        <div class="mb-3"><label>Dirección de Envío</label><textarea name="direccion" class="form-control input-raizoma" rows="2" required></textarea></div>
-                        <button type="submit" class="btn-raizoma" style="background:#10b981;">FINALIZAR Y ENVIAR</button>
-                    </form>
-                </div>
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Registro - Raízoma</title>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+            <style>
+                body { background-color: #0f172a; color: white; padding: 20px; }
+                .form-card { background: #1e293b; padding: 30px; border-radius: 20px; border: 1px solid #334155; max-width: 500px; margin: auto; }
+            </style>
+        </head>
+        <body>
+            <div class="form-card">
+                <h3 class="text-center mb-4">Inscripción Raízoma</h3>
+                <form action="/registro" method="POST">
+                    <input type="hidden" name="patrocinador" value="${ref}">
+                    <div class="mb-3"><label>Nombre Completo</label><input type="text" name="nombre" class="form-control" style="background:#0f172a; color:white; border:1px solid #444;" required></div>
+                    <div class="mb-3"><label>Usuario</label><input type="text" name="usuario" class="form-control" style="background:#0f172a; color:white; border:1px solid #444;" required></div>
+                    <div class="mb-3"><label>Contraseña</label><input type="password" name="password" class="form-control" style="background:#0f172a; color:white; border:1px solid #444;" required></div>
+                    <div class="mb-3">
+                        <label>Plan de Ingreso</label>
+                        <select name="plan" class="form-select" style="background:#0f172a; color:white; border:1px solid #444;">
+                            <option value="Partner">Partner - $15,000 MXN</option>
+                            <option value="Pro">Pro - $30,000 MXN</option>
+                        </select>
+                    </div>
+                    <div class="mb-3"><label>Hash de Pago (TxID)</label><input type="text" name="hash" class="form-control" style="background:#0f172a; color:white; border:1px solid #444;" required></div>
+                    <div class="mb-3"><label>Dirección de Envío</label><textarea name="direccion" class="form-control" style="background:#0f172a; color:white; border:1px solid #444;" rows="3" required></textarea></div>
+                    <button type="submit" class="btn btn-success w-100" style="font-weight:bold;">FINALIZAR REGISTRO</button>
+                </form>
             </div>
-        </body></html>
+        </body>
+        </html>
     `);
 });
 
-// --- PROCESAMIENTO ---
-
+// LÓGICA DE PROCESAMIENTO
 app.post('/login', (req, res) => {
     const { user, pass } = req.body;
     db.get("SELECT * FROM socios WHERE usuario = ? AND password = ?", [user, pass], (err, row) => {
@@ -156,7 +210,7 @@ app.post('/login', (req, res) => {
             req.session.socio = row;
             res.redirect('/dashboard');
         } else {
-            res.send("<script>alert('Usuario o contraseña incorrectos'); window.location='/';</script>");
+            res.send("<script>alert('Datos incorrectos'); window.location='/';</script>");
         }
     });
 });
@@ -167,33 +221,31 @@ app.post('/registro', (req, res) => {
         [nombre, usuario, password, patrocinador, plan, hash, direccion],
         function(err) {
             if (err) return res.send("Error al registrar: " + err.message);
-            res.send("<body style='background:#0f172a;color:white;text-align:center;padding-top:50px;'><h1>¡Registro Recibido!</h1><p>Estamos validando tu pago. Pronto se activará tu oficina.</p><a href='/' style='color:#3b82f6;'>Volver al inicio</a></body>");
+            res.send("<body style='background:#0f172a;color:white;text-align:center;padding-top:50px;'><h1>¡Registro Enviado!</h1><p>Activaremos tu cuenta al confirmar el pago.</p><a href='/' style='color:#3b82f6;'>Ir al Login</a></body>");
         }
     );
 });
 
-// --- ADMIN PANEL (CÓDIGO 1) ---
+// PANEL DE ADMIN
 app.get('/codigo-1-panel', (req, res) => {
     db.all("SELECT * FROM socios", (err, rows) => {
-        let tableRows = rows.map(r => `
+        let tabla = rows.map(r => `
             <tr>
                 <td>${r.nombre}</td>
                 <td>${r.plan}</td>
-                <td><small>${r.hash_pago}</small></td>
                 <td><span class="badge ${r.estado === 'activo' ? 'bg-success' : 'bg-warning'}">${r.estado}</span></td>
                 <td><a href='/aprobar/${r.id}' class="btn btn-sm btn-primary">Aprobar</a></td>
             </tr>
         `).join('');
-
         res.send(`
-            <!DOCTYPE html><html><head>${header}</head><body class="p-4">
-                <h2>Gestión de Socios</h2>
-                <table class="table table-dark table-striped mt-4">
-                    <thead><tr><th>Nombre</th><th>Plan</th><th>Hash</th><th>Estado</th><th>Acción</th></tr></thead>
-                    <tbody>${tableRows}</tbody>
+            <body style="background:#0f172a; color:white; padding:40px; font-family:sans-serif;">
+                <h2>Panel Maestro de Socios</h2>
+                <table border="1" style="width:100%; text-align:center; border-collapse:collapse; margin-top:20px;">
+                    <thead><tr><th>Nombre</th><th>Plan</th><th>Estado</th><th>Acción</th></tr></thead>
+                    <tbody>${tabla}</tbody>
                 </table>
-                <a href="/dashboard" class="btn btn-secondary">Volver al Dashboard</a>
-            </body></html>
+                <br><a href="/dashboard" style="color:white;">Regresar al Dashboard</a>
+            </body>
         `);
     });
 });
@@ -202,7 +254,6 @@ app.get('/aprobar/:id', (req, res) => {
     const id = req.params.id;
     db.get("SELECT patrocinador_id FROM socios WHERE id = ?", [id], (err, s) => {
         if (s && s.patrocinador_id) {
-            // Suman 100 PV al usuario que lo invitó
             db.run("UPDATE socios SET puntos = puntos + 100 WHERE usuario = ?", [s.patrocinador_id]);
         }
         db.run("UPDATE socios SET estado = 'activo' WHERE id = ?", [id], () => {
@@ -216,4 +267,4 @@ app.get('/logout', (req, res) => {
     res.redirect('/');
 });
 
-app.listen(port, () => console.log(`Raízoma V2026 Activo en puerto ${port}`));
+app.listen(port, () => console.log(`Servidor Raízoma en puerto ${port}`));
