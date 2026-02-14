@@ -10,9 +10,6 @@ const path = require('path');
 const session = require('express-session');
 const bodyParser = require('body-parser');
 const fs = require('fs');
-const https = require('https');
-
-const WALLET_USDT_TRC20 = 'TA4wCKDm2kNzPbJWA51CLrUAGqQcPbdtUw';
 
 const app = express();
 const port = process.env.PORT || 10000;
@@ -50,20 +47,6 @@ db.serialize(() => {
 app.use(bodyParser.urlencoded({ extended: true, limit: '15mb' }));
 app.use(bodyParser.json({ limit: '15mb' }));
 app.use(session({ secret: 'origen-vmax-secret-2026', resave: true, saveUninitialized: true }));
-
-app.get('/api/usdt-mxn', (req, res) => {
-    https.get('https://api.binance.com/api/v3/ticker/price?symbol=USDTMXN', (r) => {
-        let data = '';
-        r.on('data', c => data += c);
-        r.on('end', () => {
-            try {
-                const j = JSON.parse(data);
-                const price = parseFloat(j.price) || 0;
-                res.json({ ok: true, price, mxnPerUsdt: price, usdtPerMxn: price > 0 ? 1 / price : 0 });
-            } catch (e) { res.json({ ok: false, price: 0 }); }
-        });
-    }).on('error', () => res.json({ ok: false, price: 0 }));
-});
 
 // TEMÁTICA VISUAL BASADA EN EL PRODUCTO "RAÍZOMA ORIGEN"
 const cssOrigen = `<style>
@@ -110,9 +93,7 @@ app.post('/login', (req, res) => {
 app.get('/registro', (req, res) => {
     const ref = req.query.ref || '';
     const msgPatrocinador = ref ? `<p style="text-align:center; color:var(--teal); font-weight:bold; margin-bottom:15px">Patrocinador: <strong>${ref}</strong></p>` : '';
-    const scriptUsdt = `<script>function copiarWallet(){navigator.clipboard.writeText('${WALLET_USDT_TRC20}').then(()=>{const b=document.getElementById('btnCopyWallet');b.textContent='¡Copiado!';setTimeout(()=>b.textContent='Copiar wallet',1500)})} async function actualizarUsdt(){try{const r=await fetch('/api/usdt-mxn');const d=await r.json();if(d.ok){const p=parseFloat(d.price);document.getElementById('usdtPrice').textContent='$'+p.toLocaleString()+' MXN';document.getElementById('usdtConv').textContent='1 MXN = '+(1/p).toFixed(6)+' USDT';document.getElementById('conv300').textContent=(300/p).toFixed(2)+' USDT';document.getElementById('conv600').textContent=(600/p).toFixed(2)+' USDT';document.getElementById('conv1700').textContent=(1700/p).toFixed(2)+' USDT';document.getElementById('conv15000').textContent=(15000/p).toFixed(2)+' USDT'}}}catch(e){} } setInterval(actualizarUsdt,15000); actualizarUsdt();</script>`;
-    const cardUsdt = `<div class="card" style="border-color:var(--gold); margin-bottom:25px"><h4 style="color:var(--gold)">Pago de inscripción - USDT TRC20</h4><p style="font-size:11px; color:#aaa; margin-bottom:10px">Precio en tiempo real desde Binance</p><div style="background:rgba(66,133,133,0.1); padding:12px; border-radius:10px; margin:10px 0"><span style="font-size:11px; color:var(--teal)">1 USDT = </span><span id="usdtPrice" style="font-size:22px; font-weight:bold; color:var(--cream)">-- MXN</span></div><div style="font-size:12px; color:#aaa; margin:8px 0"><span id="usdtConv">Cargando...</span></div><div style="font-size:11px; margin:12px 0; color:var(--teal)">Referencia por plan: 300 MXN ≈ <span id="conv300">--</span> | 600 MXN ≈ <span id="conv600">--</span> | 1,700 MXN ≈ <span id="conv1700">--</span> | 15,000 MXN ≈ <span id="conv15000">--</span></div><div class="link-cell" style="margin:15px 0"><input class="vmax-input" value="${WALLET_USDT_TRC20}" readonly style="flex:1; font-size:12px"><button id="btnCopyWallet" class="copy-btn" onclick="copiarWallet()">Copiar wallet</button></div><p style="font-size:10px; color:#666">Red: TRC20 (Tron)</p></div>`;
-    res.send(`<html>${cssOrigen}${scriptUsdt}<body>${cardUsdt}<div class="card"><h2>Registro Origen</h2>${msgPatrocinador}<form action="/reg" method="POST"><input type="hidden" name="ref" value="${ref}"><input name="n" class="vmax-input" placeholder="Nombre Completo" required><input name="w" class="vmax-input" placeholder="WhatsApp (52...)" required><input name="u" class="vmax-input" placeholder="Usuario" required><input name="p" type="password" class="vmax-input" placeholder="Contraseña" required><select name="pl" class="vmax-input"><option value="Capsulas RZ Metabolico $300">Capsulas RZ Metabolico - $300</option><option value="Café RZ Origen $600">Café RZ Origen - $600</option><option value="Membresía + Origen $1,700">Membresía + Origen - $1,700</option><option value="PQT Fundador $15,000">PQT Fundador - $15,000</option></select><input name="h" class="vmax-input" placeholder="Hash de Pago / TxID" required><textarea name="d" class="vmax-input" placeholder="Dirección Completa de Envío" required style="height:80px"></textarea><button type="submit" class="vmax-btn">Enviar Inscripción</button></form></div></body></html>`);
+    res.send(`<html>${cssOrigen}<body><div class="card"><h2>Registro Origen</h2>${msgPatrocinador}<form action="/reg" method="POST"><input type="hidden" name="ref" value="${ref}"><input name="n" class="vmax-input" placeholder="Nombre Completo" required><input name="w" class="vmax-input" placeholder="WhatsApp (52...)" required><input name="u" class="vmax-input" placeholder="Usuario" required><input name="p" type="password" class="vmax-input" placeholder="Contraseña" required><select name="pl" class="vmax-input"><option value="Capsulas RZ Metabolico $300">Capsulas RZ Metabolico - $300</option><option value="Café RZ Origen $600">Café RZ Origen - $600</option><option value="Membresía + Origen $1,700">Membresía + Origen - $1,700</option><option value="PQT Fundador $15,000">PQT Fundador - $15,000</option></select><input name="h" class="vmax-input" placeholder="Hash de Pago / TxID" required><textarea name="d" class="vmax-input" placeholder="Dirección Completa de Envío" required style="height:80px"></textarea><button type="submit" class="vmax-btn">Enviar Inscripción</button></form></div></body></html>`);
 });
 
 app.post('/solicitar_retiro', (req, res) => {
