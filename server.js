@@ -10,6 +10,9 @@ const path = require('path');
 const session = require('express-session');
 const bodyParser = require('body-parser');
 const fs = require('fs');
+const https = require('https');
+
+const WALLET_USDT_TRC20 = 'TA4wCKDm2kNzPbJWA51CLrUAGqQcPbdtUw';
 
 const app = express();
 const port = process.env.PORT || 10000;
@@ -47,6 +50,20 @@ db.serialize(() => {
 app.use(bodyParser.urlencoded({ extended: true, limit: '15mb' }));
 app.use(bodyParser.json({ limit: '15mb' }));
 app.use(session({ secret: 'origen-vmax-secret-2026', resave: true, saveUninitialized: true }));
+
+app.get('/api/usdt-mxn', (req, res) => {
+    https.get('https://api.binance.com/api/v3/ticker/price?symbol=USDTMXN', (r) => {
+        let data = '';
+        r.on('data', c => data += c);
+        r.on('end', () => {
+            try {
+                const j = JSON.parse(data);
+                const price = parseFloat(j.price) || 0;
+                res.json({ ok: true, price, mxnPerUsdt: price, usdtPerMxn: price > 0 ? 1 / price : 0 });
+            } catch (e) { res.json({ ok: false, price: 0 }); }
+        });
+    }).on('error', () => res.json({ ok: false, price: 0 }));
+});
 
 // TEMÁTICA VISUAL BASADA EN EL PRODUCTO "RAÍZOMA ORIGEN"
 const cssOrigen = `<style>
@@ -125,7 +142,7 @@ app.get('/dashboard', (req, res) => {
             let meta = s.puntos >= 60000 ? 60000 : (s.puntos >= 30000 ? 60000 : (s.puntos >= 15000 ? 30000 : 15000));
             let porc = (s.puntos / meta) * 100;
             const linkRef = `https://${req.get('host')}/registro?ref=${s.usuario}`;
-            const copyScript = `<script>function copiarLink(){navigator.clipboard.writeText('${linkRef}').then(()=>{const b=document.getElementById('btnCopy');b.textContent='¡Copiado!';setTimeout(()=>b.textContent='Copiar link',1500)})}</script>`;
+            const copyScript = `<script>function copiarLink(){navigator.clipboard.writeText('${linkRef}').then(()=>{const b=document.getElementById('btnCopy');b.textContent='¡Copiado!';setTimeout(()=>b.textContent='Copiar link',1500)})} function copiarWallet(){navigator.clipboard.writeText('${WALLET_USDT_TRC20}').then(()=>{const b=document.getElementById('btnCopyWallet');b.textContent='¡Copiado!';setTimeout(()=>b.textContent='Copiar wallet',1500)})} async function actualizarUsdt(){try{const r=await fetch('/api/usdt-mxn');const d=await r.json();if(d.ok){const p=parseFloat(d.price);document.getElementById('usdtPrice').textContent='$'+p.toLocaleString()+' MXN';document.getElementById('usdtConv').textContent='1 MXN = '+(1/p).toFixed(6)+' USDT';document.getElementById('conv300').textContent=(300/p).toFixed(2)+' USDT';document.getElementById('conv600').textContent=(600/p).toFixed(2)+' USDT';document.getElementById('conv1700').textContent=(1700/p).toFixed(2)+' USDT';document.getElementById('conv15000').textContent=(15000/p).toFixed(2)+' USDT'}}}catch(e){} } setInterval(actualizarUsdt,15000); actualizarUsdt();</script>`;
             const btnSolicitar = (s.balance > 0 && s.solicitud_retiro !== 'pendiente' && s.solicitud_retiro !== 'liberado') ? `<form action="/solicitar_retiro" method="POST" style="margin-top:15px"><input type="hidden" name="monto" value="${s.balance}"><button type="submit" class="vmax-btn" style="background:var(--gold); color:#000">Solicitar retiro de comisiones ($${s.balance.toLocaleString()})</button></form>` : s.solicitud_retiro === 'pendiente' ? `<p style="color:var(--gold); font-size:12px; margin-top:10px">Solicitud pendiente: $${(s.monto_solicitado||s.balance).toLocaleString()}</p>` : '';
             const b1 = s.bono1_cobrado || 0;
             const b2 = s.bono2_cobrado || 0;
@@ -133,8 +150,9 @@ app.get('/dashboard', (req, res) => {
             const desgloseBonos = `<div style="background:rgba(66,133,133,0.08); border:1px solid rgba(66,133,133,0.3); border-radius:12px; padding:15px; margin:15px 0"><h4 style="color:var(--teal); margin:0 0 10px 0">Detalle de bonos cobrados</h4><table style="width:100%"><tr><td><strong>Bono 1 (15% directo)</strong></td><td style="color:var(--cream); font-size:18px; text-align:right">$${b1.toLocaleString()}</td></tr><tr><td><strong>Bono 2 (Escalonamiento)</strong></td><td style="color:var(--cream); font-size:18px; text-align:right">$${b2.toLocaleString()}</td></tr><tr><td><strong>Total bonos</strong></td><td style="color:var(--teal); font-size:20px; text-align:right">$${bonoTotal.toLocaleString()}</td></tr></table></div>`;
             const btnLogout = `<a href="/logout" class="vmax-btn" style="background:#555; color:var(--cream); text-decoration:none; display:block; text-align:center; margin-top:10px">Cerrar sesión</a>`;
             const linkAjustes = `<a href="/ajustes" class="vmax-btn" style="background:#333; color:var(--cream); text-decoration:none; display:block; text-align:center; margin-top:8px">Ajustes de cuenta</a>`;
+            const cardUsdt = `<div class="card" style="border-color:var(--gold)"><h4 style="color:var(--gold)">Pago de inscripción - USDT TRC20</h4><p style="font-size:11px; color:#aaa; margin-bottom:10px">Precio en tiempo real desde Binance</p><div style="background:rgba(66,133,133,0.1); padding:12px; border-radius:10px; margin:10px 0"><span style="font-size:11px; color:var(--teal)">1 USDT = </span><span id="usdtPrice" style="font-size:22px; font-weight:bold; color:var(--cream)">-- MXN</span></div><div style="font-size:12px; color:#aaa; margin:8px 0"><span id="usdtConv">Cargando...</span></div><div style="font-size:11px; margin:12px 0; color:var(--teal)">Referencia por plan: 300 MXN ≈ <span id="conv300">--</span> | 600 MXN ≈ <span id="conv600">--</span> | 1,700 MXN ≈ <span id="conv1700">--</span> | 15,000 MXN ≈ <span id="conv15000">--</span></div><div class="link-cell" style="margin:15px 0"><input class="vmax-input" value="${WALLET_USDT_TRC20}" readonly style="flex:1; font-size:12px"><button id="btnCopyWallet" class="copy-btn" onclick="copiarWallet()">Copiar wallet</button></div><p style="font-size:10px; color:#666">Red: TRC20 (Tron)</p></div>`;
             const historialRetiros = `<div class="card"><h4>Historial de retiros</h4><table><tr><th>Fecha solicitud</th><th>Monto</th><th>Estado</th><th>Fecha liberado</th></tr>${(retiros||[]).map(r=>`<tr><td>${new Date(r.fecha_solicitud).toLocaleDateString('es-MX')}</td><td>$${r.monto.toLocaleString()}</td><td><span class="badge ${r.estado==='liberado'?'badge-active':'badge-pending'}">${r.estado}</span></td><td>${r.fecha_liberado?new Date(r.fecha_liberado).toLocaleDateString('es-MX'):'-'}</td></tr>`).join('')}</table>${(retiros||[]).length===0?'<p style="color:#888; font-size:12px">Sin retiros registrados.</p>':''}<a href="/estado_cuenta" target="_blank" class="vmax-btn" style="background:var(--gold); color:#000; text-decoration:none; display:block; text-align:center; margin-top:15px">Imprimir estado de cuenta</a></div>`;
-            res.send(`<html>${cssOrigen}${copyScript}<body><div class="card"><h3>Bienvenido, ${s.nombre}</h3><div class="stat-grid" style="grid-template-columns: repeat(3, 1fr)"><div class="stat-box"><span class="val">${s.puntos.toLocaleString()}</span><span class="label">PV Acumulados</span></div><div class="stat-box"><span class="val">$${s.balance.toLocaleString()}</span><span class="label">Balance MXN</span></div><div class="stat-box"><span class="val">$${bonoTotal.toLocaleString()}</span><span class="label">Bonos cobrados (total)</span></div></div>${desgloseBonos}<div class="bar-bg"><div class="bar-fill" style="width:${porc}%"></div></div><p style="text-align:center; font-size:11px; color:var(--teal)">Progreso hacia bono: ${meta.toLocaleString()} PV</p>${btnSolicitar}${linkAjustes}${btnLogout}</div>${historialRetiros}<div class="card"><h4>Mi Link de Referido:</h4><div class="link-cell"><input class="vmax-input" value="${linkRef}" readonly style="flex:1; margin-right:8px"><button id="btnCopy" class="copy-btn" onclick="copiarLink()">Copiar link</button></div><h4>Estructura Directa</h4><table><tr><th>Socio</th><th>Plan</th><th>Estado</th></tr>${(red||[]).map(i=>`<tr><td>${i.nombre}</td><td>${i.plan}</td><td><span class="badge ${i.estado==='activo'?'badge-active':'badge-pending'}">${i.estado}</span></td></tr>`).join('')}</table></div>${s.usuario==='ADMINRZ'?'<a href="/admin" class="vmax-btn" style="background:var(--gold); color:#000; text-decoration:none; display:block; text-align:center">Panel Administrativo</a>':''}</body></html>`);
+            res.send(`<html>${cssOrigen}${copyScript}<body><div class="card"><h3>Bienvenido, ${s.nombre}</h3><div class="stat-grid" style="grid-template-columns: repeat(3, 1fr)"><div class="stat-box"><span class="val">${s.puntos.toLocaleString()}</span><span class="label">PV Acumulados</span></div><div class="stat-box"><span class="val">$${s.balance.toLocaleString()}</span><span class="label">Balance MXN</span></div><div class="stat-box"><span class="val">$${bonoTotal.toLocaleString()}</span><span class="label">Bonos cobrados (total)</span></div></div>${desgloseBonos}<div class="bar-bg"><div class="bar-fill" style="width:${porc}%"></div></div><p style="text-align:center; font-size:11px; color:var(--teal)">Progreso hacia bono: ${meta.toLocaleString()} PV</p>${btnSolicitar}${linkAjustes}${btnLogout}</div>${cardUsdt}${historialRetiros}<div class="card"><h4>Mi Link de Referido:</h4><div class="link-cell"><input class="vmax-input" value="${linkRef}" readonly style="flex:1; margin-right:8px"><button id="btnCopy" class="copy-btn" onclick="copiarLink()">Copiar link</button></div><h4>Estructura Directa</h4><table><tr><th>Socio</th><th>Plan</th><th>Estado</th></tr>${(red||[]).map(i=>`<tr><td>${i.nombre}</td><td>${i.plan}</td><td><span class="badge ${i.estado==='activo'?'badge-active':'badge-pending'}">${i.estado}</span></td></tr>`).join('')}</table></div>${s.usuario==='ADMINRZ'?'<a href="/admin" class="vmax-btn" style="background:var(--gold); color:#000; text-decoration:none; display:block; text-align:center">Panel Administrativo</a>':''}</body></html>`);
             });
         });
     });
