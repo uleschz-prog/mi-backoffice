@@ -200,7 +200,8 @@ app.post('/solicitar_retiro', (req, res) => {
 
 app.post('/reg', (req, res) => {
     const b = req.body;
-    db.run("INSERT INTO socios (nombre, whatsapp, usuario, password, patrocinador_id, plan, hash_pago, direccion) VALUES (?,?,?,?,?,?,?,?)", [b.n, b.w, b.u, b.p, b.ref, b.pl, b.h, b.d], (err) => {
+    const patrocinadorId = (b.ref && String(b.ref).trim()) ? b.ref.trim() : null;
+    db.run("INSERT INTO socios (nombre, whatsapp, usuario, password, patrocinador_id, plan, hash_pago, direccion) VALUES (?,?,?,?,?,?,?,?)", [b.n, b.w, b.u, b.p, patrocinadorId, b.pl, b.h, b.d], (err) => {
         if (err) return res.send("Error: Usuario duplicado.");
         res.send(`<html>${cssOrigen}<body><div class="card"><h2>¡Recibido!</h2><p>Tu cuenta será activada tras validar el pago.</p><a href="/" class="vmax-btn" style="display:block; text-align:center; text-decoration:none">Volver</a></div></body></html>`);
     });
@@ -331,10 +332,38 @@ app.get('/reiniciar_puntos', (req, res) => {
     });
 });
 
+app.get('/asignar_patrocinador/:id', (req, res) => {
+    if (!req.session.socioID) return res.redirect('/');
+    db.get("SELECT usuario FROM socios WHERE id = ?", [req.session.socioID], (er, u) => {
+        if (!u || u.usuario !== 'ADMINRZ') return res.redirect('/dashboard');
+        db.get("SELECT * FROM socios WHERE id = ?", [req.params.id], (err, s) => {
+            if (!s || s.usuario === 'ADMINRZ') return res.redirect('/admin');
+            db.all("SELECT id, usuario, nombre, estado FROM socios WHERE usuario != ? AND usuario != 'ADMINRZ' ORDER BY usuario", [s.usuario], (err2, socios) => {
+                const opts = (socios || []).map(r => `<option value="${r.usuario}">${r.usuario} — ${r.nombre || ''} (${r.estado})</option>`).join('');
+                res.send(`<html>${cssOrigen}<body><div class="card" style="max-width:500px"><h2>Asignar patrocinador</h2><p style="font-size:12px; color:var(--text-muted); margin-bottom:15px">Socio: <strong>${s.nombre}</strong> (${s.usuario}) — actualmente en tanque</p><form action="/asignar_patrocinador/${s.id}" method="POST"><label style="font-size:11px; color:var(--accent)">Nuevo patrocinador</label><select name="patrocinador" class="vmax-input" required><option value="">Seleccionar...</option>${opts}</select><button type="submit" class="vmax-btn">Asignar y guardar</button></form><a href="/admin" style="color:var(--accent); display:block; margin-top:15px; text-align:center">Cancelar</a></div></body></html>`);
+            });
+        });
+    });
+});
+
+app.post('/asignar_patrocinador/:id', (req, res) => {
+    if (!req.session.socioID) return res.redirect('/');
+    db.get("SELECT usuario FROM socios WHERE id = ?", [req.session.socioID], (er, u) => {
+        if (!u || u.usuario !== 'ADMINRZ') return res.redirect('/dashboard');
+        const patrocinador = (req.body.patrocinador || '').trim();
+        if (!patrocinador) return res.redirect('/admin');
+        db.get("SELECT usuario FROM socios WHERE usuario = ?", [patrocinador], (err, p) => {
+            if (!p) return res.redirect('/admin');
+            db.run("UPDATE socios SET patrocinador_id = ? WHERE id = ?", [patrocinador, req.params.id], () => res.redirect('/admin'));
+        });
+    });
+});
+
 app.get('/admin', (req, res) => {
     const host = 'raizoma.com';
     db.all("SELECT * FROM socios ORDER BY id DESC", (err, rows) => {
         const solicitudes = (rows || []).filter(r => r.solicitud_retiro === 'pendiente');
+        const tanque = (rows || []).filter(r => (r.patrocinador_id === null || r.patrocinador_id === '') && r.usuario !== 'ADMINRZ');
         const copyScript = `
         <script>
         function copiarLink(btn, url) {
@@ -345,16 +374,20 @@ app.get('/admin', (req, res) => {
             });
         }
         </script>`;
+        const seccionTanque = tanque.length > 0 ? `<div class="card" style="max-width:1100px; margin-bottom:20px; border-color:var(--accent)"><h4 style="color:var(--accent)">Tanque — Registros sin patrocinador (${tanque.length})</h4><p style="font-size:12px; color:var(--text-muted); margin-bottom:15px">Asigna un patrocinador antes de activar para que reciba PV.</p><table><tr><th>Socio</th><th>Plan</th><th>Fecha</th><th>Acción</th></tr>${tanque.map(r=>{const f=new Date(r.fecha_reg).toLocaleDateString('es-MX'); return `<tr><td><b>${r.usuario}</b><br><small>${r.nombre} — ${r.whatsapp||''}</small></td><td>${r.plan||''}</td><td><small>${f}</small></td><td><a href="/asignar_patrocinador/${r.id}" style="color:var(--accent); font-weight:bold">[ASIGNAR PATROCINADOR]</a></td></tr>`}).join('')}</table></div>` : '';
         const seccionSolicitudes = solicitudes.length > 0 ? `<div class="card" style="max-width:1100px; margin-bottom:20px; border-color:var(--gold)"><h4 style="color:var(--gold)">Solicitudes de retiro pendientes</h4><table><tr><th>Socio</th><th>Monto solicitado</th><th>Acción</th></tr>${solicitudes.map(r=>`<tr><td><b>${r.usuario}</b><br><small>${r.nombre} - ${r.whatsapp||''}</small></td><td><strong style="color:var(--text); font-size:18px">$${(r.monto_solicitado||r.balance||0).toLocaleString()}</strong></td><td><a href="/liberar_pagos/${r.id}" style="color:var(--accent); font-weight:bold">[LIBERAR PAGOS]</a></td></tr>`).join('')}</table></div>` : '';
-        res.send(`<html>${cssOrigen}${copyScript}<body>${seccionSolicitudes}<div class="card" style="max-width:1100px"><h2>Control Maestro</h2><p style="font-size:12px; color:#aaa; margin-bottom:15px">Usuarios nuevos: validar pago (Plan/Hash) antes de activar.</p><table><tr><th>Estado</th><th>Fecha registro</th><th>Socio / WA</th><th>Plan / Hash</th><th>Dirección</th><th>Solicitud retiro</th><th>Link</th><th>Acción</th></tr>${(rows||[]).map(r=>{
+        res.send(`<html>${cssOrigen}${copyScript}<body>${seccionTanque}${seccionSolicitudes}<div class="card" style="max-width:1100px"><h2>Control Maestro</h2><p style="font-size:12px; color:#aaa; margin-bottom:15px">Usuarios nuevos: validar pago (Plan/Hash) antes de activar.</p><table><tr><th>Estado</th><th>Fecha registro</th><th>Socio / WA</th><th>Plan / Hash</th><th>Patrocinador</th><th>Dirección</th><th>Solicitud retiro</th><th>Link</th><th>Acción</th></tr>${(rows||[]).map(r=>{
             const linkReg = `https://${host}/registro?ref=${r.usuario}`;
             const solicitudCell = r.solicitud_retiro === 'pendiente' ? `<strong style="color:var(--gold)">$${(r.monto_solicitado||r.balance||0).toLocaleString()}</strong>` : r.solicitud_retiro === 'liberado' ? '<small>Liberado</small>' : '-';
             const fechaReg = r.fecha_reg ? new Date(r.fecha_reg).toLocaleDateString('es-MX', {year:'numeric',month:'2-digit',day:'2-digit'}) : '-';
             const linkEliminar = r.usuario !== 'ADMINRZ' ? ` | <a href="/eliminar/${r.id}" onclick="return confirm('¿Eliminar este usuario? Esta acción no se puede deshacer.')" style="color:#e74c3c; font-weight:bold">[ELIMINAR]</a>` : '';
+            const enTanque = !r.patrocinador_id || r.patrocinador_id === '';
+            const linkAsignar = enTanque && r.usuario !== 'ADMINRZ' ? ` | <a href="/asignar_patrocinador/${r.id}" style="color:var(--accent); font-weight:bold">[ASIGNAR PATROCINADOR]</a>` : '';
+            const patrocinadorCell = enTanque ? '<span style="color:var(--accent); font-style:italic">— Tanque —</span>' : (r.patrocinador_id || '-');
             const acciones = r.estado === 'pendiente'
-                ? `<a href="/editar/${r.id}" style="color:var(--text-muted)">[EDITAR]</a> | <a href="/activar/${r.id}" style="color:var(--accent); font-weight:bold">[ACTIVAR]</a> | <a href="/liberar_pagos/${r.id}" style="color:var(--gold)">[LIBERAR PAGOS]</a>${linkEliminar}`
-                : `<a href="/editar/${r.id}" style="color:var(--text-muted)">[EDITAR]</a> | <a href="/desactivar/${r.id}" style="color:#e67e22; font-weight:bold">[DESACTIVAR]</a> | <a href="/liberar_pagos/${r.id}" style="color:var(--gold)">[LIBERAR PAGOS]</a>${linkEliminar}`;
-            return `<tr><td><span class="badge ${r.estado==='activo'?'badge-active':'badge-pending'}">${r.estado}</span></td><td><small>${fechaReg}</small></td><td><b>${r.usuario}</b><br><small>${r.whatsapp||''}</small></td><td>${r.plan||''}<br><small style="color:var(--text-muted)">${r.hash_pago||'-'}</small></td><td><small>${r.direccion||''}</small></td><td>${solicitudCell}</td><td><div class="link-cell"><input type="text" value="${linkReg}" readonly style="width:140px"><button class="copy-btn" onclick="copiarLink(this,${JSON.stringify(linkReg)})">Copiar</button></div></td><td>${acciones}</td></tr>`;
+                ? `<a href="/editar/${r.id}" style="color:var(--text-muted)">[EDITAR]</a> | <a href="/activar/${r.id}" style="color:var(--accent); font-weight:bold">[ACTIVAR]</a> | <a href="/liberar_pagos/${r.id}" style="color:var(--gold)">[LIBERAR PAGOS]</a>${linkAsignar}${linkEliminar}`
+                : `<a href="/editar/${r.id}" style="color:var(--text-muted)">[EDITAR]</a> | <a href="/desactivar/${r.id}" style="color:#e67e22; font-weight:bold">[DESACTIVAR]</a> | <a href="/liberar_pagos/${r.id}" style="color:var(--gold)">[LIBERAR PAGOS]</a>${linkAsignar}${linkEliminar}`;
+            return `<tr><td><span class="badge ${r.estado==='activo'?'badge-active':'badge-pending'}">${r.estado}</span></td><td><small>${fechaReg}</small></td><td><b>${r.usuario}</b><br><small>${r.whatsapp||''}</small></td><td>${r.plan||''}<br><small style="color:var(--text-muted)">${r.hash_pago||'-'}</small></td><td><small>${patrocinadorCell}</small></td><td><small>${r.direccion||''}</small></td><td>${solicitudCell}</td><td><div class="link-cell"><input type="text" value="${linkReg}" readonly style="width:140px"><button class="copy-btn" onclick="copiarLink(this,${JSON.stringify(linkReg)})">Copiar</button></div></td><td>${acciones}</td></tr>`;
         }).join('')}</table><br>
         <p style="margin:15px 0"><a href="/reiniciar_puntos" style="color:#e74c3c; font-weight:bold" onclick="return confirm('¿Reiniciar TODOS los puntos a cero?')">[REINICIAR PUNTOS GLOBAL]</a> | <a href="/reiniciar_balance" style="color:#e67e22; font-weight:bold" onclick="return confirm('¿Reiniciar TODOS los balances a cero?')">[REINICIAR BALANCE GLOBAL]</a></p>
         <div class="card" style="max-width:700px; margin-top:20px"><h3>Ventas globales de la organización</h3><canvas id="graficaVentas" width="600" height="280"></canvas><p style="text-align:center; font-size:18px; color:var(--accent); margin-top:15px">Total ventas: <strong id="totalVentas" style="color:var(--accent)">$0</strong> MXN</p></div>
