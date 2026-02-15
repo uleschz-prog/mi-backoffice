@@ -155,13 +155,15 @@ app.get('/admin', (req, res) => {
         }
         </script>`;
         const seccionSolicitudes = solicitudes.length > 0 ? `<div class="card" style="max-width:1100px; margin-bottom:20px; border-color:var(--gold)"><h4 style="color:var(--gold)">Solicitudes de retiro pendientes</h4><table><tr><th>Socio</th><th>Monto solicitado</th><th>Acción</th></tr>${solicitudes.map(r=>`<tr><td><b>${r.usuario}</b><br><small>${r.nombre} - ${r.whatsapp||''}</small></td><td><strong style="color:var(--cream); font-size:18px">$${(r.monto_solicitado||r.balance||0).toLocaleString()}</strong></td><td><a href="/liberar_pagos/${r.id}" style="color:var(--teal); font-weight:bold">[LIBERAR PAGOS]</a></td></tr>`).join('')}</table></div>` : '';
-        res.send(`<html>${cssOrigen}${copyScript}<body>${seccionSolicitudes}<div class="card" style="max-width:1100px"><h2>Control Maestro</h2><p style="font-size:12px; color:#aaa; margin-bottom:15px">Usuarios nuevos: validar pago (Plan/Hash) antes de activar.</p><table><tr><th>Estado</th><th>Socio / WA</th><th>Plan / Hash</th><th>Dirección</th><th>Solicitud retiro</th><th>Link</th><th>Acción</th></tr>${(rows||[]).map(r=>{
+        res.send(`<html>${cssOrigen}${copyScript}<body>${seccionSolicitudes}<div class="card" style="max-width:1100px"><h2>Control Maestro</h2><p style="font-size:12px; color:#aaa; margin-bottom:15px">Usuarios nuevos: validar pago (Plan/Hash) antes de activar.</p><table><tr><th>Estado</th><th>Fecha registro</th><th>Socio / WA</th><th>Plan / Hash</th><th>Dirección</th><th>Solicitud retiro</th><th>Link</th><th>Acción</th></tr>${(rows||[]).map(r=>{
             const linkReg = `https://${host}/registro?ref=${r.usuario}`;
             const solicitudCell = r.solicitud_retiro === 'pendiente' ? `<strong style="color:var(--gold)">$${(r.monto_solicitado||r.balance||0).toLocaleString()}</strong>` : r.solicitud_retiro === 'liberado' ? '<small>Liberado</small>' : '-';
+            const fechaReg = r.fecha_reg ? new Date(r.fecha_reg).toLocaleDateString('es-MX', {year:'numeric',month:'2-digit',day:'2-digit'}) : '-';
+            const linkEliminar = r.usuario !== 'ADMINRZ' ? ` | <a href="/eliminar/${r.id}" onclick="return confirm('¿Eliminar este usuario? Esta acción no se puede deshacer.')" style="color:#e74c3c; font-weight:bold">[ELIMINAR]</a>` : '';
             const acciones = r.estado === 'pendiente'
-                ? `<a href="/editar/${r.id}" style="color:#aaa">[EDITAR]</a> | <a href="/activar/${r.id}" style="color:var(--teal); font-weight:bold">[ACTIVAR]</a> | <a href="/liberar_pagos/${r.id}" style="color:var(--gold)">[LIBERAR PAGOS]</a>`
-                : `<a href="/editar/${r.id}" style="color:#aaa">[EDITAR]</a> | <a href="/desactivar/${r.id}" style="color:#e67e22; font-weight:bold">[DESACTIVAR]</a> | <a href="/liberar_pagos/${r.id}" style="color:var(--gold)">[LIBERAR PAGOS]</a>`;
-            return `<tr><td><span class="badge ${r.estado==='activo'?'badge-active':'badge-pending'}">${r.estado}</span></td><td><b>${r.usuario}</b><br><small>${r.whatsapp||''}</small></td><td>${r.plan||''}<br><small style="color:var(--teal)">${r.hash_pago||'-'}</small></td><td><small>${r.direccion||''}</small></td><td>${solicitudCell}</td><td><div class="link-cell"><input type="text" value="${linkReg}" readonly style="width:140px"><button class="copy-btn" onclick="copiarLink(this,${JSON.stringify(linkReg)})">Copiar</button></div></td><td>${acciones}</td></tr>`;
+                ? `<a href="/editar/${r.id}" style="color:#aaa">[EDITAR]</a> | <a href="/activar/${r.id}" style="color:var(--teal); font-weight:bold">[ACTIVAR]</a> | <a href="/liberar_pagos/${r.id}" style="color:var(--gold)">[LIBERAR PAGOS]</a>${linkEliminar}`
+                : `<a href="/editar/${r.id}" style="color:#aaa">[EDITAR]</a> | <a href="/desactivar/${r.id}" style="color:#e67e22; font-weight:bold">[DESACTIVAR]</a> | <a href="/liberar_pagos/${r.id}" style="color:var(--gold)">[LIBERAR PAGOS]</a>${linkEliminar}`;
+            return `<tr><td><span class="badge ${r.estado==='activo'?'badge-active':'badge-pending'}">${r.estado}</span></td><td><small>${fechaReg}</small></td><td><b>${r.usuario}</b><br><small>${r.whatsapp||''}</small></td><td>${r.plan||''}<br><small style="color:var(--teal)">${r.hash_pago||'-'}</small></td><td><small>${r.direccion||''}</small></td><td>${solicitudCell}</td><td><div class="link-cell"><input type="text" value="${linkReg}" readonly style="width:140px"><button class="copy-btn" onclick="copiarLink(this,${JSON.stringify(linkReg)})">Copiar</button></div></td><td>${acciones}</td></tr>`;
         }).join('')}</table><br><a href="/dashboard" style="color:var(--cream)">Volver al Dashboard</a> | <a href="/logout" style="color:#888">Cerrar sesión</a></div></body></html>`);
     });
 });
@@ -185,6 +187,15 @@ app.get('/activar/:id', (req, res) => {
                 res.redirect('/admin');
             });
         } else res.redirect('/admin');
+    });
+});
+
+app.get('/eliminar/:id', (req, res) => {
+    db.get("SELECT usuario FROM socios WHERE id = ?", [req.params.id], (err, s) => {
+        if (!s || s.usuario === 'ADMINRZ') return res.redirect('/admin');
+        db.run("DELETE FROM historial_retiros WHERE socio_id = ?", [req.params.id], () => {
+            db.run("DELETE FROM socios WHERE id = ?", [req.params.id], () => res.redirect('/admin'));
+        });
     });
 });
 
