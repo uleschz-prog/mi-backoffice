@@ -276,26 +276,42 @@ app.get('/compras', (req, res) => {
         const precioCapsulas = esPremium ? 300 : 490;
         const precioCafe = esPremium ? 600 : 790;
         const comprasHtml = `
-        <div class="card" style="max-width:600px">
+        <style>
+        .prod-card{display:flex;gap:24px;align-items:flex-start;background:var(--section-bg);border:1px solid var(--border);padding:24px;border-radius:16px;margin-bottom:24px;flex-wrap:wrap}
+        .prod-img-wrap{flex:0 0 160px;background:linear-gradient(180deg,#f0f2f5 0%,#f9fafb 100%);border-radius:12px;padding:20px;display:flex;align-items:center;justify-content:center;min-height:180px;position:relative;overflow:hidden;border:1px solid var(--border)}
+        .prod-img-wrap img{max-width:140px;max-height:160px;object-fit:contain;filter:drop-shadow(0 4px 12px rgba(0,0,0,0.08))}
+        .prod-info{flex:1;min-width:220px}
+        .ingredientes{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+        .ing-tag{font-size:10px;padding:4px 10px;border-radius:20px;background:rgba(0,102,255,0.1);color:var(--accent);font-weight:600;animation:float 3s ease-in-out infinite;border:1px solid rgba(0,102,255,0.2)}
+        .ing-tag:nth-child(1){animation-delay:0s}.ing-tag:nth-child(2){animation-delay:0.3s}.ing-tag:nth-child(3){animation-delay:0.6s}.ing-tag:nth-child(4){animation-delay:0.9s}.ing-tag:nth-child(5){animation-delay:1.2s}
+        @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+        </style>
+        <div class="card" style="max-width:700px">
         <h2>Comprar productos</h2>
-        <p style="font-size:12px; color:#aaa; margin-bottom:15px">Tu plan actual: <strong>${plan || 'No definido'}</strong> ${esPremium ? '(precio preferencial)' : ''}</p>
-        <div style="display:grid; gap:20px; margin:20px 0">
-        <div style="background:var(--section-bg); border:1px solid var(--border); padding:20px; border-radius:15px">
-        <h4 style="color:var(--accent); margin:0 0 10px 0">Cápsulas</h4>
-        <p style="font-size:24px; color:var(--text); margin:0 0 8px 0">$${precioCapsulas.toLocaleString()} MXN</p>
-        <p style="font-size:14px; color:#aaa">En USDT: <strong id="usdtCaps">--</strong> USDT <small>(tipo de cambio en tiempo real)</small></p>
-        <p style="font-size:11px; color:var(--accent); margin-top:10px">Wallet USDT (TRC20):</p>
-        <div class="link-cell" style="margin-top:5px"><input class="vmax-input" id="wallet" value="${WALLET_USDT}" readonly style="font-size:12px"><button class="copy-btn" onclick="copiarWallet()">Copiar</button></div>
-        </div>
-        <div style="background:var(--section-bg); border:1px solid var(--border); padding:20px; border-radius:15px">
-        <h4 style="color:var(--accent); margin:0 0 10px 0">Café Origen</h4>
-        <p style="font-size:24px; color:var(--text); margin:0 0 8px 0">$${precioCafe.toLocaleString()} MXN</p>
-        <p style="font-size:14px; color:#aaa">En USDT: <strong id="usdtCafe">--</strong> USDT <small>(tipo de cambio en tiempo real)</small></p>
-        <p style="font-size:11px; color:var(--accent); margin-top:10px">Wallet USDT (TRC20):</p>
+        <p style="font-size:12px; color:var(--text-muted); margin-bottom:20px">Tu plan actual: <strong>${plan || 'No definido'}</strong> ${esPremium ? '(precio preferencial)' : ''}</p>
+        <div class="prod-card">
+        <div class="prod-img-wrap"><img src="/images/capsulas.png" alt="Cápsulas Zoma Metabólico"></div>
+        <div class="prod-info">
+        <h4 style="color:var(--accent); margin:0 0 8px 0">Cápsulas Zoma Metabólico</h4>
+        <div class="ingredientes"><span class="ing-tag">Vinagre de manzana</span><span class="ing-tag">Jengibre</span><span class="ing-tag">Té verde</span><span class="ing-tag">Té rojo</span><span class="ing-tag">Alcachofa</span></div>
+        <p style="font-size:24px; color:var(--text); margin:12px 0 6px 0">$${precioCapsulas.toLocaleString()} MXN</p>
+        <p style="font-size:14px; color:var(--text-muted)">En USDT: <strong id="usdtCaps">--</strong> USDT <small>(tipo de cambio en tiempo real)</small></p>
+        <p style="font-size:11px; color:var(--accent); margin-top:12px">Wallet USDT (TRC20):</p>
         <div class="link-cell" style="margin-top:5px"><input class="vmax-input" value="${WALLET_USDT}" readonly style="font-size:12px"><button class="copy-btn" onclick="copiarWallet()">Copiar</button></div>
         </div>
         </div>
-        <p style="font-size:11px; color:#666">Realiza el pago en USDT (TRC20) a la wallet indicada. Incluye tu Hash/TxID en el mensaje de seguimiento.</p>
+        <div class="prod-card">
+        <div class="prod-img-wrap"><img src="/images/cafe-origen.png" alt="Café Raízoma Origen"></div>
+        <div class="prod-info">
+        <h4 style="color:var(--accent); margin:0 0 8px 0">Café Raízoma Origen</h4>
+        <div class="ingredientes"><span class="ing-tag">Reishi</span><span class="ing-tag">Shiitake</span><span class="ing-tag">Canela</span><span class="ing-tag">Cardamomo</span></div>
+        <p style="font-size:24px; color:var(--text); margin:12px 0 6px 0">$${precioCafe.toLocaleString()} MXN</p>
+        <p style="font-size:14px; color:var(--text-muted)">En USDT: <strong id="usdtCafe">--</strong> USDT <small>(tipo de cambio en tiempo real)</small></p>
+        <p style="font-size:11px; color:var(--accent); margin-top:12px">Wallet USDT (TRC20):</p>
+        <div class="link-cell" style="margin-top:5px"><input class="vmax-input" value="${WALLET_USDT}" readonly style="font-size:12px"><button class="copy-btn" onclick="copiarWallet()">Copiar</button></div>
+        </div>
+        </div>
+        <p style="font-size:11px; color:var(--text-muted)">Realiza el pago en USDT (TRC20) a la wallet indicada. Incluye tu Hash/TxID en el mensaje de seguimiento.</p>
         <a href="/dashboard" style="color:var(--accent); display:block; margin-top:15px; text-align:center">Volver al Dashboard</a>
         </div>
         <script>
