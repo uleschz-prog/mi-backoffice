@@ -9,7 +9,23 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const session = require('express-session');
 const bodyParser = require('body-parser');
+const https = require('https');
 const fs = require('fs');
+
+const WALLET_USDT = 'TA4wCKDm2kNzPbJWA51CLrUAGqQcPbdtUw';
+
+function getUsdtMxnRate(cb) {
+    https.get('https://api.binance.com/api/v3/ticker/price?symbol=USDTMXN', (res) => {
+        let d = '';
+        res.on('data', c => d += c);
+        res.on('end', () => {
+            try {
+                const j = JSON.parse(d);
+                cb(null, parseFloat(j.price) || 20);
+            } catch (e) { cb(e, 20); }
+        });
+    }).on('error', e => cb(e, 20));
+}
 
 const app = express();
 const port = process.env.PORT || 10000;
@@ -103,7 +119,42 @@ app.post('/login', (req, res) => {
 app.get('/registro', (req, res) => {
     const ref = req.query.ref || '';
     const msgPatrocinador = ref ? `<p style="text-align:center; color:var(--teal); font-weight:bold; margin-bottom:15px">Patrocinador: <strong>${ref}</strong></p>` : '';
-    res.send(`<html>${cssOrigen}<body><div class="card"><h2>Registro Origen</h2>${msgPatrocinador}<form action="/reg" method="POST"><input type="hidden" name="ref" value="${ref}"><input name="n" class="vmax-input" placeholder="Nombre Completo" required><input name="w" class="vmax-input" placeholder="WhatsApp (52...)" required><input name="u" class="vmax-input" placeholder="Usuario" required><input name="p" type="password" class="vmax-input" placeholder="Contraseña" required><select name="pl" class="vmax-input"><option value="Cápsulas $490">Cápsulas $490</option><option value="Café Origen $790">Café Origen $790</option><option value="Membresía Anual $1,750">Membresía Anual $1,750</option><option value="Fundador $15,000">Fundador $15,000</option></select><input name="h" class="vmax-input" placeholder="Hash de Pago / TxID" required><textarea name="d" class="vmax-input" placeholder="Dirección Completa de Envío" required style="height:80px"></textarea><button type="submit" class="vmax-btn">Enviar Inscripción</button></form></div></body></html>`);
+    const planes = [
+        { v: 'Cápsulas $490', l: 'Cápsulas $490', mxn: 490 },
+        { v: 'Café Origen $790', l: 'Café Origen $790', mxn: 790 },
+        { v: 'Membresía Anual $1,750', l: 'Membresía Anual $1,750', mxn: 1750 },
+        { v: 'Fundador $15,000', l: 'Fundador $15,000', mxn: 15000 }
+    ];
+    const optsPlan = planes.map(p => `<option value="${p.v}" data-mxn="${p.mxn}">${p.l}</option>`).join('');
+    const regScript = `
+    <script>
+    const planesMap = {${planes.map(p=>`"${p.v}":${p.mxn}`).join(',')}};
+    const wallet = "${WALLET_USDT}";
+    function actualizarPago(){
+        const sel = document.getElementById('planSelect');
+        const mxn = parseInt(sel.options[sel.selectedIndex].dataset.mxn) || 0;
+        const box = document.getElementById('boxPago');
+        box.style.display = mxn ? 'block' : 'none';
+        box.querySelector('.mxnVal').textContent = mxn.toLocaleString();
+        fetch('/api/usdt-mxn').then(r=>r.json()).then(d=>{
+            const usdt = (mxn/(d.rate||20)).toFixed(2);
+            box.querySelector('.usdtVal').textContent = usdt;
+        }).catch(()=>box.querySelector('.usdtVal').textContent='--');
+    }
+    document.addEventListener('DOMContentLoaded',()=>{
+        document.getElementById('planSelect').addEventListener('change',actualizarPago);
+        actualizarPago();
+    });
+    function copiarWallet(){ navigator.clipboard.writeText(wallet); alert('Wallet copiada'); }
+    </script>`;
+    const boxPago = `
+    <div id="boxPago" style="background:rgba(66,133,133,0.15); border:1px solid var(--teal); border-radius:12px; padding:15px; margin:15px 0">
+    <h4 style="color:var(--teal); margin:0 0 10px 0">Pago en USDT (tipo de cambio Binance)</h4>
+    <p style="margin:0 0 5px 0">Monto: <strong class="mxnVal">0</strong> MXN = <strong class="usdtVal">--</strong> USDT</p>
+    <p style="font-size:11px; color:var(--teal); margin:8px 0 5px 0">Wallet USDT (TRC20):</p>
+    <div class="link-cell"><input class="vmax-input" value="${WALLET_USDT}" readonly style="font-size:12px"><button type="button" class="copy-btn" onclick="copiarWallet()">Copiar</button></div>
+    </div>`;
+    res.send(`<html>${cssOrigen}${regScript}<body><div class="card"><h2>Registro Origen</h2>${msgPatrocinador}<form action="/reg" method="POST"><input type="hidden" name="ref" value="${ref}"><input name="n" class="vmax-input" placeholder="Nombre Completo" required><input name="w" class="vmax-input" placeholder="WhatsApp (52...)" required><input name="u" class="vmax-input" placeholder="Usuario" required><input name="p" type="password" class="vmax-input" placeholder="Contraseña" required><select name="pl" id="planSelect" class="vmax-input">${optsPlan}</select>${boxPago}<input name="h" class="vmax-input" placeholder="Hash de Pago / TxID" required><textarea name="d" class="vmax-input" placeholder="Dirección Completa de Envío" required style="height:80px"></textarea><button type="submit" class="vmax-btn">Enviar Inscripción</button></form></div></body></html>`);
 });
 
 app.post('/solicitar_retiro', (req, res) => {
@@ -163,8 +214,9 @@ app.get('/dashboard', (req, res) => {
             const cronoBox = `<div style="background:rgba(66,133,133,0.15); border:1px solid var(--teal); border-radius:12px; padding:15px; margin:15px 0; text-align:center"><h4 style="color:var(--teal); margin:0 0 8px 0">Ciclo Bono 2 (30 días)</h4><p style="font-size:12px; color:#aaa; margin:0 0 5px 0">PV del ciclo actual: <strong style="color:var(--cream)">${ptsCiclo.toLocaleString()}</strong> / ${meta.toLocaleString()}</p><p style="font-size:12px; color:var(--teal); margin:0">Próximo reinicio en: <span id="countdown30" style="font-size:18px; color:var(--cream); font-weight:bold">--</span></p></div>`;
             const btnLogout = `<a href="/logout" class="vmax-btn" style="background:#555; color:var(--cream); text-decoration:none; display:block; text-align:center; margin-top:10px">Cerrar sesión</a>`;
             const linkAjustes = `<a href="/ajustes" class="vmax-btn" style="background:#333; color:var(--cream); text-decoration:none; display:block; text-align:center; margin-top:8px">Ajustes de cuenta</a>`;
+            const linkCompras = `<a href="/compras" class="vmax-btn" style="background:var(--gold); color:#000; text-decoration:none; display:block; text-align:center; margin-top:8px">Comprar productos</a>`;
             const historialRetiros = `<div class="card"><h4>Historial de retiros</h4><table><tr><th>Fecha solicitud</th><th>Monto</th><th>Estado</th><th>Fecha liberado</th></tr>${(retiros||[]).map(r=>`<tr><td>${new Date(r.fecha_solicitud).toLocaleDateString('es-MX')}</td><td>$${r.monto.toLocaleString()}</td><td><span class="badge ${r.estado==='liberado'?'badge-active':'badge-pending'}">${r.estado}</span></td><td>${r.fecha_liberado?new Date(r.fecha_liberado).toLocaleDateString('es-MX'):'-'}</td></tr>`).join('')}</table>${(retiros||[]).length===0?'<p style="color:#888; font-size:12px">Sin retiros registrados.</p>':''}<a href="/estado_cuenta" target="_blank" class="vmax-btn" style="background:var(--gold); color:#000; text-decoration:none; display:block; text-align:center; margin-top:15px">Imprimir estado de cuenta</a></div>`;
-            res.send(`<html>${cssOrigen}${copyScript}${countdownScript}<body><div class="card"><h3>Bienvenido, ${socio.nombre}</h3><div class="stat-grid" style="grid-template-columns: repeat(3, 1fr)"><div class="stat-box"><span class="val">${socio.puntos.toLocaleString()}</span><span class="label">PV totales</span></div><div class="stat-box"><span class="val">${ptsCiclo.toLocaleString()}</span><span class="label">PV ciclo (Bono 2)</span></div><div class="stat-box"><span class="val">$${socio.balance.toLocaleString()}</span><span class="label">Balance MXN</span></div></div>${cronoBox}${desgloseBonos}<div class="bar-bg"><div class="bar-fill" style="width:${porc}%"></div></div><p style="text-align:center; font-size:11px; color:var(--teal)">Progreso Bono 2: ${ptsCiclo.toLocaleString()} / ${meta.toLocaleString()} PV</p>${btnSolicitar}${linkAjustes}${btnLogout}</div>${historialRetiros}<div class="card"><h4>Mi Link de Referido:</h4><div class="link-cell"><input class="vmax-input" value="${linkRef}" readonly style="flex:1; margin-right:8px"><button id="btnCopy" class="copy-btn" onclick="copiarLink()">Copiar link</button></div><h4>Estructura Directa</h4><table><tr><th>Socio</th><th>Plan</th><th>Estado</th></tr>${(red||[]).map(i=>`<tr><td>${i.nombre}</td><td>${i.plan}</td><td><span class="badge ${i.estado==='activo'?'badge-active':'badge-pending'}">${i.estado}</span></td></tr>`).join('')}</table></div>${socio.usuario==='ADMINRZ'?'<a href="/admin" class="vmax-btn" style="background:var(--gold); color:#000; text-decoration:none; display:block; text-align:center">Panel Administrativo</a>':''}</body></html>`);
+            res.send(`<html>${cssOrigen}${copyScript}${countdownScript}<body><div class="card"><h3>Bienvenido, ${socio.nombre}</h3><div class="stat-grid" style="grid-template-columns: repeat(3, 1fr)"><div class="stat-box"><span class="val">${socio.puntos.toLocaleString()}</span><span class="label">PV totales</span></div><div class="stat-box"><span class="val">${ptsCiclo.toLocaleString()}</span><span class="label">PV ciclo (Bono 2)</span></div><div class="stat-box"><span class="val">$${socio.balance.toLocaleString()}</span><span class="label">Balance MXN</span></div></div>${cronoBox}${desgloseBonos}<div class="bar-bg"><div class="bar-fill" style="width:${porc}%"></div></div><p style="text-align:center; font-size:11px; color:var(--teal)">Progreso Bono 2: ${ptsCiclo.toLocaleString()} / ${meta.toLocaleString()} PV</p>${btnSolicitar}${linkCompras}${linkAjustes}${btnLogout}</div>${historialRetiros}<div class="card"><h4>Mi Link de Referido:</h4><div class="link-cell"><input class="vmax-input" value="${linkRef}" readonly style="flex:1; margin-right:8px"><button id="btnCopy" class="copy-btn" onclick="copiarLink()">Copiar link</button></div><h4>Estructura Directa</h4><table><tr><th>Socio</th><th>Plan</th><th>Estado</th></tr>${(red||[]).map(i=>`<tr><td>${i.nombre}</td><td>${i.plan}</td><td><span class="badge ${i.estado==='activo'?'badge-active':'badge-pending'}">${i.estado}</span></td></tr>`).join('')}</table></div>${socio.usuario==='ADMINRZ'?'<a href="/admin" class="vmax-btn" style="background:var(--gold); color:#000; text-decoration:none; display:block; text-align:center">Panel Administrativo</a>':''}</body></html>`);
         };
         const fetchAndRender = (socio) => {
             db.all("SELECT * FROM socios WHERE patrocinador_id = ?", [socio.usuario], (err, red) => {
@@ -179,6 +231,64 @@ app.get('/dashboard', (req, res) => {
                 fetchAndRender(s);
             });
         } else fetchAndRender(s);
+    });
+});
+
+app.get('/api/usdt-mxn', (req, res) => {
+    getUsdtMxnRate((err, rate) => res.json({ rate: rate || 20, wallet: WALLET_USDT }));
+});
+
+app.get('/compras', (req, res) => {
+    if (!req.session.socioID) return res.redirect('/');
+    db.get("SELECT plan FROM socios WHERE id = ?", [req.session.socioID], (err, s) => {
+        if (!s) return res.redirect('/');
+        const plan = (s.plan || '').trim();
+        const esPremium = plan.includes('Membresía') || plan.includes('Fundador');
+        const precioCapsulas = esPremium ? 300 : 490;
+        const precioCafe = esPremium ? 600 : 790;
+        const comprasHtml = `
+        <div class="card" style="max-width:600px">
+        <h2>Comprar productos</h2>
+        <p style="font-size:12px; color:#aaa; margin-bottom:15px">Tu plan actual: <strong>${plan || 'No definido'}</strong> ${esPremium ? '(precio preferencial)' : ''}</p>
+        <div style="display:grid; gap:20px; margin:20px 0">
+        <div style="background:rgba(66,133,133,0.1); border:1px solid var(--teal); padding:20px; border-radius:15px">
+        <h4 style="color:var(--teal); margin:0 0 10px 0">Cápsulas</h4>
+        <p style="font-size:24px; color:var(--cream); margin:0 0 8px 0">$${precioCapsulas.toLocaleString()} MXN</p>
+        <p style="font-size:14px; color:#aaa">En USDT: <strong id="usdtCaps">--</strong> USDT <small>(tipo de cambio en tiempo real)</small></p>
+        <p style="font-size:11px; color:var(--teal); margin-top:10px">Wallet USDT (TRC20):</p>
+        <div class="link-cell" style="margin-top:5px"><input class="vmax-input" id="wallet" value="${WALLET_USDT}" readonly style="font-size:12px"><button class="copy-btn" onclick="copiarWallet()">Copiar</button></div>
+        </div>
+        <div style="background:rgba(66,133,133,0.1); border:1px solid var(--teal); padding:20px; border-radius:15px">
+        <h4 style="color:var(--teal); margin:0 0 10px 0">Café Origen</h4>
+        <p style="font-size:24px; color:var(--cream); margin:0 0 8px 0">$${precioCafe.toLocaleString()} MXN</p>
+        <p style="font-size:14px; color:#aaa">En USDT: <strong id="usdtCafe">--</strong> USDT <small>(tipo de cambio en tiempo real)</small></p>
+        <p style="font-size:11px; color:var(--teal); margin-top:10px">Wallet USDT (TRC20):</p>
+        <div class="link-cell" style="margin-top:5px"><input class="vmax-input" value="${WALLET_USDT}" readonly style="font-size:12px"><button class="copy-btn" onclick="copiarWallet()">Copiar</button></div>
+        </div>
+        </div>
+        <p style="font-size:11px; color:#666">Realiza el pago en USDT (TRC20) a la wallet indicada. Incluye tu Hash/TxID en el mensaje de seguimiento.</p>
+        <a href="/dashboard" style="color:var(--cream); display:block; margin-top:15px; text-align:center">Volver al Dashboard</a>
+        </div>
+        <script>
+        fetch('/api/usdt-mxn').then(r=>r.json()).then(d=>{
+            const r=d.rate||20;
+            document.getElementById('usdtCaps').textContent=(${precioCapsulas}/r).toFixed(2);
+            document.getElementById('usdtCafe').textContent=(${precioCafe}/r).toFixed(2);
+        }).catch(()=>{ document.getElementById('usdtCaps').textContent='N/A'; document.getElementById('usdtCafe').textContent='N/A'; });
+        function copiarWallet(){ navigator.clipboard.writeText('${WALLET_USDT}'); alert('Wallet copiada'); }
+        </script>`;
+        res.send(`<html>${cssOrigen}<body>${comprasHtml}</body></html>`);
+    });
+});
+
+app.get('/reiniciar_balance', (req, res) => {
+    if (!req.session.socioID) return res.redirect('/');
+    db.get("SELECT usuario FROM socios WHERE id = ?", [req.session.socioID], (er, u) => {
+        if (!u || u.usuario !== 'ADMINRZ') return res.redirect('/dashboard');
+        db.run("UPDATE socios SET balance = 0, solicitud_retiro = 'no', monto_solicitado = 0, detalles_retiro = ''", function(err) {
+            if (err) return res.redirect('/admin');
+            res.redirect('/admin');
+        });
     });
 });
 
@@ -217,7 +327,21 @@ app.get('/admin', (req, res) => {
                 ? `<a href="/editar/${r.id}" style="color:#aaa">[EDITAR]</a> | <a href="/activar/${r.id}" style="color:var(--teal); font-weight:bold">[ACTIVAR]</a> | <a href="/liberar_pagos/${r.id}" style="color:var(--gold)">[LIBERAR PAGOS]</a>${linkEliminar}`
                 : `<a href="/editar/${r.id}" style="color:#aaa">[EDITAR]</a> | <a href="/desactivar/${r.id}" style="color:#e67e22; font-weight:bold">[DESACTIVAR]</a> | <a href="/liberar_pagos/${r.id}" style="color:var(--gold)">[LIBERAR PAGOS]</a>${linkEliminar}`;
             return `<tr><td><span class="badge ${r.estado==='activo'?'badge-active':'badge-pending'}">${r.estado}</span></td><td><small>${fechaReg}</small></td><td><b>${r.usuario}</b><br><small>${r.whatsapp||''}</small></td><td>${r.plan||''}<br><small style="color:var(--teal)">${r.hash_pago||'-'}</small></td><td><small>${r.direccion||''}</small></td><td>${solicitudCell}</td><td><div class="link-cell"><input type="text" value="${linkReg}" readonly style="width:140px"><button class="copy-btn" onclick="copiarLink(this,${JSON.stringify(linkReg)})">Copiar</button></div></td><td>${acciones}</td></tr>`;
-        }).join('')}</table><br><a href="/reiniciar_puntos" style="color:#e74c3c; font-weight:bold" onclick="return confirm('¿Reiniciar TODOS los puntos a cero en todos los socios (incluyendo ADMINRZ)? Esta acción no se puede deshacer.')">[REINICIAR PUNTOS GLOBAL]</a> | <a href="/dashboard" style="color:var(--cream)">Volver al Dashboard</a> | <a href="/logout" style="color:#888">Cerrar sesión</a></div></body></html>`);
+        }).join('')}</table><br>
+        <p style="margin:15px 0"><a href="/reiniciar_puntos" style="color:#e74c3c; font-weight:bold" onclick="return confirm('¿Reiniciar TODOS los puntos a cero?')">[REINICIAR PUNTOS GLOBAL]</a> | <a href="/reiniciar_balance" style="color:#e67e22; font-weight:bold" onclick="return confirm('¿Reiniciar TODOS los balances a cero?')">[REINICIAR BALANCE GLOBAL]</a></p>
+        <div class="card" style="max-width:700px; margin-top:20px"><h3>Ventas globales de la organización</h3><canvas id="graficaVentas" width="600" height="280"></canvas><p style="text-align:center; font-size:18px; color:var(--cream); margin-top:15px">Total ventas: <strong id="totalVentas">$0</strong> MXN</p></div>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script>
+        (function(){
+            const datos = ${JSON.stringify((rows||[]).filter(r=>r.estado==='activo'&&r.usuario!=='ADMINRZ').reduce((a,r)=>{const v=parseInt(String(r.plan||'').replace(/[^0-9]/g,''))||0; a.total+=v; a.porPlan[r.plan||'Otro']=(a.porPlan[r.plan||'Otro']||0)+v; return a;},{total:0,porPlan:{}}))};
+            document.getElementById('totalVentas').textContent='$'+datos.total.toLocaleString();
+            const ctx=document.getElementById('graficaVentas').getContext('2d');
+            const labels=Object.keys(datos.porPlan).filter(k=>k!=='Otro'||Object.keys(datos.porPlan).length===1);
+            const values=labels.map(l=>datos.porPlan[l]||0);
+            new Chart(ctx,{type:'bar',data:{labels:labels.length?labels:['Sin datos'],datasets:[{label:'Ventas MXN',data:values.length?values:[0],backgroundColor:['#428585','#d4af37','#F5F5DC','#2d6a6a']}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:'#aaa'}},x:{ticks:{color:'#aaa'}}}});
+        })();
+        </script>
+        <br><a href="/dashboard" style="color:var(--cream)">Volver al Dashboard</a> | <a href="/logout" style="color:#888">Cerrar sesión</a></div></body></html>`);
     });
 });
 
