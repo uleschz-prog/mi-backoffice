@@ -80,7 +80,7 @@ const cssOrigen = `<style>
 
 // RUTAS LÓGICAS
 app.get('/', (req, res) => {
-    res.send(`<html>${cssOrigen}<body><div class="card"><h2>Raízoma V.MAX</h2><form action="/login" method="POST"><input name="u" class="vmax-input" placeholder="Usuario" required><input name="p" type="password" class="vmax-input" placeholder="Contraseña" required><button class="vmax-btn">Entrar al Sistema</button></form><p style="text-align:center; font-size:13px">¿Nuevo socio? <a href="/registro" style="color:var(--teal)">Inscríbete aquí</a></p></div></body></html>`);
+    res.send(`<html>${cssOrigen}<body><div class="card"><h2>Raízoma</h2><form action="/login" method="POST"><input name="u" class="vmax-input" placeholder="Usuario" required><input name="p" type="password" class="vmax-input" placeholder="Contraseña" required><button class="vmax-btn">Entrar al Sistema</button></form><p style="text-align:center; font-size:13px">¿Nuevo socio? <a href="/registro" style="color:var(--teal)">Inscríbete aquí</a></p></div></body></html>`);
 });
 
 app.post('/login', (req, res) => {
@@ -124,7 +124,7 @@ app.get('/dashboard', (req, res) => {
             db.all("SELECT * FROM historial_retiros WHERE socio_id = ? ORDER BY fecha_solicitud DESC", [req.session.socioID], (err, retiros) => {
             let meta = s.puntos >= 60000 ? 60000 : (s.puntos >= 30000 ? 60000 : (s.puntos >= 15000 ? 30000 : 15000));
             let porc = (s.puntos / meta) * 100;
-            const linkRef = `https://${req.get('host')}/registro?ref=${s.usuario}`;
+            const linkRef = `https://raizoma.com/registro?ref=${s.usuario}`;
             const copyScript = `<script>function copiarLink(){navigator.clipboard.writeText('${linkRef}').then(()=>{const b=document.getElementById('btnCopy');b.textContent='¡Copiado!';setTimeout(()=>b.textContent='Copiar link',1500)})}</script>`;
             const btnSolicitar = (s.balance > 0 && s.solicitud_retiro !== 'pendiente' && s.solicitud_retiro !== 'liberado') ? `<form action="/solicitar_retiro" method="POST" style="margin-top:15px"><input type="hidden" name="monto" value="${s.balance}"><button type="submit" class="vmax-btn" style="background:var(--gold); color:#000">Solicitar retiro de comisiones ($${s.balance.toLocaleString()})</button></form>` : s.solicitud_retiro === 'pendiente' ? `<p style="color:var(--gold); font-size:12px; margin-top:10px">Solicitud pendiente: $${(s.monto_solicitado||s.balance).toLocaleString()}</p>` : '';
             const b1 = s.bono1_cobrado || 0;
@@ -141,7 +141,7 @@ app.get('/dashboard', (req, res) => {
 });
 
 app.get('/admin', (req, res) => {
-    const host = req.get('host');
+    const host = 'raizoma.com';
     db.all("SELECT * FROM socios ORDER BY id DESC", (err, rows) => {
         const solicitudes = (rows || []).filter(r => r.solicitud_retiro === 'pendiente');
         const copyScript = `
@@ -288,7 +288,7 @@ app.get('/estado_cuenta', (req, res) => {
                 button:hover{background:#356}
             </style>`;
             const rows = (retiros||[]).map(r=>`<tr><td>${new Date(r.fecha_solicitud).toLocaleString('es-MX')}</td><td>$${r.monto.toLocaleString()}</td><td>${r.estado}</td><td>${r.fecha_liberado?new Date(r.fecha_liberado).toLocaleString('es-MX'):'-'}</td></tr>`).join('');
-            res.send(`<html><head><title>Estado de cuenta - ${s.nombre}</title>${printCss}</head><body><button onclick="window.print()" class="no-print">Imprimir / Guardar PDF</button><h1>Raízoma V.MAX - Estado de cuenta</h1><div class="info"><strong> Socio:</strong> ${s.nombre}<br><strong>Usuario:</strong> ${s.usuario}<br><strong>Balance actual:</strong> $${(s.balance||0).toLocaleString()} MXN<br><strong>Fecha de emisión:</strong> ${new Date().toLocaleString('es-MX')}</div><h2>Historial de retiros</h2><table><tr><th>Fecha solicitud</th><th>Monto</th><th>Estado</th><th>Fecha liberado</th></tr>${rows}</table><p class="total">Total retirado (liberado): $${totalRetirado.toLocaleString()} MXN</p><p style="font-size:11px;color:#666;margin-top:40px">Documento generado automáticamente. Raízoma V.MAX Infinity.</p></body></html>`);
+            res.send(`<html><head><title>Estado de cuenta - ${s.nombre}</title>${printCss}</head><body><button onclick="window.print()" class="no-print">Imprimir / Guardar PDF</button><h1>Raízoma - Estado de cuenta</h1><div class="info"><strong> Socio:</strong> ${s.nombre}<br><strong>Usuario:</strong> ${s.usuario}<br><strong>Balance actual:</strong> $${(s.balance||0).toLocaleString()} MXN<br><strong>Fecha de emisión:</strong> ${new Date().toLocaleString('es-MX')}</div><h2>Historial de retiros</h2><table><tr><th>Fecha solicitud</th><th>Monto</th><th>Estado</th><th>Fecha liberado</th></tr>${rows}</table><p class="total">Total retirado (liberado): $${totalRetirado.toLocaleString()} MXN</p><p style="font-size:11px;color:#666;margin-top:40px">Documento generado automáticamente. raizoma.com</p></body></html>`);
         });
     });
 });
