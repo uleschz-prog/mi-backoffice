@@ -93,7 +93,7 @@ app.post('/login', (req, res) => {
 app.get('/registro', (req, res) => {
     const ref = req.query.ref || '';
     const msgPatrocinador = ref ? `<p style="text-align:center; color:var(--teal); font-weight:bold; margin-bottom:15px">Patrocinador: <strong>${ref}</strong></p>` : '';
-    res.send(`<html>${cssOrigen}<body><div class="card"><h2>Registro Origen</h2>${msgPatrocinador}<form action="/reg" method="POST"><input type="hidden" name="ref" value="${ref}"><input name="n" class="vmax-input" placeholder="Nombre Completo" required><input name="w" class="vmax-input" placeholder="WhatsApp (52...)" required><input name="u" class="vmax-input" placeholder="Usuario" required><input name="p" type="password" class="vmax-input" placeholder="Contraseña" required><select name="pl" class="vmax-input"><option value="Capsulas RZ Metabolico $300">Capsulas RZ Metabolico - $300</option><option value="Café RZ Origen $600">Café RZ Origen - $600</option><option value="Membresía + Origen $1,700">Membresía + Origen - $1,700</option><option value="PQT Fundador $15,000">PQT Fundador - $15,000</option></select><input name="h" class="vmax-input" placeholder="Hash de Pago / TxID" required><textarea name="d" class="vmax-input" placeholder="Dirección Completa de Envío" required style="height:80px"></textarea><button type="submit" class="vmax-btn">Enviar Inscripción</button></form></div></body></html>`);
+    res.send(`<html>${cssOrigen}<body><div class="card"><h2>Registro Origen</h2>${msgPatrocinador}<form action="/reg" method="POST"><input type="hidden" name="ref" value="${ref}"><input name="n" class="vmax-input" placeholder="Nombre Completo" required><input name="w" class="vmax-input" placeholder="WhatsApp (52...)" required><input name="u" class="vmax-input" placeholder="Usuario" required><input name="p" type="password" class="vmax-input" placeholder="Contraseña" required><select name="pl" class="vmax-input"><option value="Cápsulas $490">Cápsulas $490</option><option value="Café Origen $790">Café Origen $790</option><option value="Membresía Anual $1,750">Membresía Anual $1,750</option><option value="Fundador $15,000">Fundador $15,000</option></select><input name="h" class="vmax-input" placeholder="Hash de Pago / TxID" required><textarea name="d" class="vmax-input" placeholder="Dirección Completa de Envío" required style="height:80px"></textarea><button type="submit" class="vmax-btn">Enviar Inscripción</button></form></div></body></html>`);
 });
 
 app.post('/solicitar_retiro', (req, res) => {
@@ -205,10 +205,10 @@ app.get('/regresar_pendiente/:id', (req, res) => {
 });
 
 const opcionesPlan = [
-    { v: 'Capsulas RZ Metabolico $300', l: 'Capsulas RZ Metabolico - $300' },
-    { v: 'Café RZ Origen $600', l: 'Café RZ Origen - $600' },
-    { v: 'Membresía + Origen $1,700', l: 'Membresía + Origen - $1,700' },
-    { v: 'PQT Fundador $15,000', l: 'PQT Fundador - $15,000' }
+    { v: 'Cápsulas $490', l: 'Cápsulas $490' },
+    { v: 'Café Origen $790', l: 'Café Origen $790' },
+    { v: 'Membresía Anual $1,750', l: 'Membresía Anual $1,750' },
+    { v: 'Fundador $15,000', l: 'Fundador $15,000' }
 ];
 
 app.get('/editar/:id', (req, res) => {
