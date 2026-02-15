@@ -32,6 +32,14 @@ db.serialize(() => {
     db.run("ALTER TABLE socios ADD COLUMN bono1_cobrado REAL DEFAULT 0", () => {}); // Bono 15%
     db.run("ALTER TABLE socios ADD COLUMN bono2_cobrado REAL DEFAULT 0", () => {});
     db.run("ALTER TABLE socios ADD COLUMN email TEXT", () => {});
+    db.run(`CREATE TABLE IF NOT EXISTS activacion_detalle (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        socio_activado_id INTEGER NOT NULL,
+        usuario_afectado TEXT NOT NULL,
+        puntos_add REAL DEFAULT 0,
+        bono1_add REAL DEFAULT 0,
+        bono2_add REAL DEFAULT 0
+    )`);
     db.run(`CREATE TABLE IF NOT EXISTS historial_retiros (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         socio_id INTEGER NOT NULL,
@@ -168,33 +176,87 @@ app.get('/admin', (req, res) => {
     });
 });
 
+// Revertir PV y bonos al desactivar/eliminar (deshace lo que sumó la activación)
+function revertirActivacion(socioId, cb) {
+    db.all("SELECT * FROM activacion_detalle WHERE socio_activado_id = ?", [socioId], (err, rows) => {
+        if (!rows || rows.length === 0) return cb();
+        let pending = rows.length;
+        rows.forEach(r => {
+            const pts = r.puntos_add || 0, b1 = r.bono1_add || 0, b2 = r.bono2_add || 0, tot = b1 + b2;
+            db.run("UPDATE socios SET puntos = CASE WHEN puntos - ? < 0 THEN 0 ELSE puntos - ? END, volumen_red = CASE WHEN volumen_red - ? < 0 THEN 0 ELSE volumen_red - ? END, balance = CASE WHEN balance - ? < 0 THEN 0 ELSE balance - ? END, bono_cobrado = CASE WHEN bono_cobrado - ? < 0 THEN 0 ELSE bono_cobrado - ? END, bono1_cobrado = CASE WHEN bono1_cobrado - ? < 0 THEN 0 ELSE bono1_cobrado - ? END, bono2_cobrado = CASE WHEN bono2_cobrado - ? < 0 THEN 0 ELSE bono2_cobrado - ? END WHERE usuario = ?",
+                [pts, pts, pts, pts, tot, tot, tot, tot, b1, b1, b2, b2, r.usuario_afectado], () => {
+                if (--pending === 0) db.run("DELETE FROM activacion_detalle WHERE socio_activado_id = ?", [socioId], () => cb());
+            });
+        });
+    });
+}
+
+// Obtener cadena de uplines (patrocinador y toda la línea ascendente)
+function revertirActivacion(db, socioId, cb) {
+    db.all("SELECT * FROM activacion_detalle WHERE socio_activado_id = ?", [socioId], (err, rows) => {
+        if (!rows || rows.length === 0) return cb();
+        let pending = rows.length;
+        const totalBono = (r) => (r.bono1_add || 0) + (r.bono2_add || 0);
+        rows.forEach(r => {
+            const pts = r.puntos_add || 0, b1 = r.bono1_add || 0, b2 = r.bono2_add || 0, tot = b1 + b2;
+            db.run("UPDATE socios SET puntos = CASE WHEN puntos - ? < 0 THEN 0 ELSE puntos - ? END, volumen_red = CASE WHEN volumen_red - ? < 0 THEN 0 ELSE volumen_red - ? END, balance = CASE WHEN balance - ? < 0 THEN 0 ELSE balance - ? END, bono_cobrado = CASE WHEN bono_cobrado - ? < 0 THEN 0 ELSE bono_cobrado - ? END, bono1_cobrado = CASE WHEN bono1_cobrado - ? < 0 THEN 0 ELSE bono1_cobrado - ? END, bono2_cobrado = CASE WHEN bono2_cobrado - ? < 0 THEN 0 ELSE bono2_cobrado - ? END WHERE usuario = ?",
+                [pts, pts, pts, pts, tot, tot, tot, tot, b1, b1, b2, b2, r.usuario_afectado], () => {
+                if (--pending === 0) {
+                    db.run("DELETE FROM activacion_detalle WHERE socio_activado_id = ?", [socioId], () => cb());
+                }
+            });
+        });
+    });
+}
+
+function getUplineChain(patrocinadorId, cb) {
+    const chain = [];
+    const next = (pid) => {
+        if (!pid) return cb(chain);
+        db.get("SELECT usuario, patrocinador_id FROM socios WHERE usuario = ?", [pid], (er, row) => {
+            if (!row) return cb(chain);
+            chain.push(row.usuario);
+            next(row.patrocinador_id);
+        });
+    };
+    next(patrocinadorId);
+}
+
 app.get('/activar/:id', (req, res) => {
     db.get("SELECT * FROM socios WHERE id = ?", [req.params.id], (err, s) => {
         if (s && s.estado === 'pendiente') {
-            const valPlan = parseInt(s.plan.replace(/[^0-9]/g, '')) || 0;
-            db.run("UPDATE socios SET estado = 'activo' WHERE id = ?", [req.params.id], () => {
-                if (s.patrocinador_id) {
-                    db.run("UPDATE socios SET puntos = puntos + ?, volumen_red = volumen_red + ? WHERE usuario = ?", [valPlan, valPlan, s.patrocinador_id], () => {
-                        db.get("SELECT puntos, bono_cobrado, bono1_cobrado, bono2_cobrado FROM socios WHERE usuario = ?", [s.patrocinador_id], (err, p) => {
-                            const bono1Add = valPlan * 0.15; // Bono 1: 15% directo por activación
+            const valPlan = parseInt(String(s.plan).replace(/[^0-9]/g, '')) || 0;
+            if (valPlan <= 0) return db.run("UPDATE socios SET estado = 'activo' WHERE id = ?", [req.params.id], () => res.redirect('/admin'));
+            getUplineChain(s.patrocinador_id, (uplines) => {
+                if (uplines.length === 0) return db.run("UPDATE socios SET estado = 'activo' WHERE id = ?", [req.params.id], () => res.redirect('/admin'));
+                const procesar = (idx) => {
+                    if (idx >= uplines.length) return db.run("UPDATE socios SET estado = 'activo' WHERE id = ?", [req.params.id], () => res.redirect('/admin'));
+                    const usuario = uplines[idx];
+                    const esDirecto = idx === 0;
+                    db.run("UPDATE socios SET puntos = puntos + ?, volumen_red = volumen_red + ? WHERE usuario = ?", [valPlan, valPlan, usuario], () => {
+                        db.get("SELECT puntos, bono_cobrado, bono1_cobrado, bono2_cobrado FROM socios WHERE usuario = ?", [usuario], (er, p) => {
+                            const bono1Add = esDirecto ? valPlan * 0.15 : 0;
                             const totalBono = p.puntos >= 60000 ? 12000 : (p.puntos >= 30000 ? 6000 : (p.puntos >= 15000 ? 1500 : 0));
-                            const bono2Add = Math.max(0, totalBono - (p.bono_cobrado || 0)); // Bono 2: Escalonamiento (por meta PV)
+                            const bono2Add = Math.max(0, totalBono - (p.bono_cobrado || 0));
                             const totalAdd = bono1Add + bono2Add;
-                            if (totalAdd > 0) db.run("UPDATE socios SET balance = balance + ?, bono_cobrado = bono_cobrado + ?, bono1_cobrado = bono1_cobrado + ?, bono2_cobrado = bono2_cobrado + ? WHERE usuario = ?", [totalAdd, totalAdd, bono1Add, bono2Add, s.patrocinador_id]);
+                            if (totalAdd > 0) db.run("UPDATE socios SET balance = balance + ?, bono_cobrado = bono_cobrado + ?, bono1_cobrado = bono1_cobrado + ?, bono2_cobrado = bono2_cobrado + ? WHERE usuario = ?", [totalAdd, totalAdd, bono1Add, bono2Add, usuario]);
+                            db.run("INSERT INTO activacion_detalle (socio_activado_id, usuario_afectado, puntos_add, bono1_add, bono2_add) VALUES (?,?,?,?,?)", [s.id, usuario, valPlan, bono1Add, bono2Add], () => procesar(idx + 1));
                         });
                     });
-                }
-                res.redirect('/admin');
+                };
+                procesar(0);
             });
         } else res.redirect('/admin');
     });
 });
 
 app.get('/eliminar/:id', (req, res) => {
-    db.get("SELECT usuario FROM socios WHERE id = ?", [req.params.id], (err, s) => {
+    db.get("SELECT id, usuario, estado FROM socios WHERE id = ?", [req.params.id], (err, s) => {
         if (!s || s.usuario === 'ADMINRZ') return res.redirect('/admin');
-        db.run("DELETE FROM historial_retiros WHERE socio_id = ?", [req.params.id], () => {
-            db.run("DELETE FROM socios WHERE id = ?", [req.params.id], () => res.redirect('/admin'));
+        revertirActivacion(s.id, () => {
+            db.run("DELETE FROM historial_retiros WHERE socio_id = ?", [req.params.id], () => {
+                db.run("DELETE FROM socios WHERE id = ?", [req.params.id], () => res.redirect('/admin'));
+            });
         });
     });
 });
@@ -202,7 +264,9 @@ app.get('/eliminar/:id', (req, res) => {
 app.get('/desactivar/:id', (req, res) => {
     db.get("SELECT * FROM socios WHERE id = ?", [req.params.id], (err, s) => {
         if (s && s.estado === 'activo' && s.usuario !== 'ADMINRZ') {
-            db.run("UPDATE socios SET estado = 'pendiente' WHERE id = ?", [req.params.id], () => res.redirect('/admin'));
+            revertirActivacion(s.id, () => {
+                db.run("UPDATE socios SET estado = 'pendiente' WHERE id = ?", [req.params.id], () => res.redirect('/admin'));
+            });
         } else res.redirect('/admin');
     });
 });
