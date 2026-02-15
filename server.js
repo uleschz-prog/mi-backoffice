@@ -31,6 +31,8 @@ db.serialize(() => {
     db.run("ALTER TABLE socios ADD COLUMN monto_solicitado REAL DEFAULT 0", () => {});
     db.run("ALTER TABLE socios ADD COLUMN bono1_cobrado REAL DEFAULT 0", () => {}); // Bono 15%
     db.run("ALTER TABLE socios ADD COLUMN bono2_cobrado REAL DEFAULT 0", () => {});
+    db.run("ALTER TABLE socios ADD COLUMN puntos_ciclo REAL DEFAULT 0", () => {});
+    db.run("ALTER TABLE socios ADD COLUMN ciclo_actual INTEGER DEFAULT 0", () => {});
     db.run("ALTER TABLE socios ADD COLUMN email TEXT", () => {});
     db.run(`CREATE TABLE IF NOT EXISTS activacion_detalle (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -128,22 +130,65 @@ app.post('/reg', (req, res) => {
 app.get('/dashboard', (req, res) => {
     if (!req.session.socioID) return res.redirect('/');
     db.get("SELECT * FROM socios WHERE id = ?", [req.session.socioID], (err, s) => {
-        db.all("SELECT * FROM socios WHERE patrocinador_id = ?", [s.usuario], (err, red) => {
-            db.all("SELECT * FROM historial_retiros WHERE socio_id = ? ORDER BY fecha_solicitud DESC", [req.session.socioID], (err, retiros) => {
-            let meta = s.puntos >= 60000 ? 60000 : (s.puntos >= 30000 ? 60000 : (s.puntos >= 15000 ? 30000 : 15000));
-            let porc = (s.puntos / meta) * 100;
-            const linkRef = `https://raizoma.com/registro?ref=${s.usuario}`;
+        if (!s) return res.redirect('/');
+        const fechaRegMs = s.fecha_reg ? new Date(s.fecha_reg).getTime() : Date.now();
+        const ciclo30 = 30 * 24 * 60 * 60 * 1000;
+        const cicloNow = Math.floor((Date.now() - fechaRegMs) / ciclo30);
+        const cicloStored = s.ciclo_actual || 0;
+        const doRender = (socio, red, retiros) => {
+            if (cicloNow > cicloStored) { socio.puntos_ciclo = 0; socio.bono2_cobrado = 0; }
+            const ptsCiclo = socio.puntos_ciclo || 0;
+            let meta = ptsCiclo >= 60000 ? 60000 : (ptsCiclo >= 30000 ? 60000 : (ptsCiclo >= 15000 ? 30000 : 15000));
+            let porc = meta > 0 ? Math.min(100, (ptsCiclo / meta) * 100) : 0;
+            const proximoResetMs = fechaRegMs + (cicloNow + 1) * ciclo30;
+            const countdownScript = `<script>
+            (function(){
+                var p=${proximoResetMs};
+                function upd(){
+                    var now=Date.now(), rest=Math.max(0,p-now);
+                    var d=Math.floor(rest/86400000), h=Math.floor((rest%86400000)/3600000), m=Math.floor((rest%3600000)/60000), s=Math.floor((rest%60000)/1000);
+                    var el=document.getElementById('countdown30');
+                    if(el) el.textContent=d+'d '+h+'h '+m+'m '+s+'s';
+                }
+                upd(); setInterval(upd, 1000);
+            })();
+            </script>`;
+            const linkRef = `https://raizoma.com/registro?ref=${socio.usuario}`;
             const copyScript = `<script>function copiarLink(){navigator.clipboard.writeText('${linkRef}').then(()=>{const b=document.getElementById('btnCopy');b.textContent='¡Copiado!';setTimeout(()=>b.textContent='Copiar link',1500)})}</script>`;
-            const btnSolicitar = (s.balance > 0 && s.solicitud_retiro !== 'pendiente' && s.solicitud_retiro !== 'liberado') ? `<form action="/solicitar_retiro" method="POST" style="margin-top:15px"><input type="hidden" name="monto" value="${s.balance}"><button type="submit" class="vmax-btn" style="background:var(--gold); color:#000">Solicitar retiro de comisiones ($${s.balance.toLocaleString()})</button></form>` : s.solicitud_retiro === 'pendiente' ? `<p style="color:var(--gold); font-size:12px; margin-top:10px">Solicitud pendiente: $${(s.monto_solicitado||s.balance).toLocaleString()}</p>` : '';
-            const b1 = s.bono1_cobrado || 0;
-            const b2 = s.bono2_cobrado || 0;
-            const bonoTotal = (s.bono_cobrado || 0);
+            const btnSolicitar = (socio.balance > 0 && socio.solicitud_retiro !== 'pendiente' && socio.solicitud_retiro !== 'liberado') ? `<form action="/solicitar_retiro" method="POST" style="margin-top:15px"><input type="hidden" name="monto" value="${socio.balance}"><button type="submit" class="vmax-btn" style="background:var(--gold); color:#000">Solicitar retiro de comisiones ($${socio.balance.toLocaleString()})</button></form>` : socio.solicitud_retiro === 'pendiente' ? `<p style="color:var(--gold); font-size:12px; margin-top:10px">Solicitud pendiente: $${(socio.monto_solicitado||socio.balance).toLocaleString()}</p>` : '';
+            const b1 = socio.bono1_cobrado || 0;
+            const b2 = socio.bono2_cobrado || 0;
+            const bonoTotal = (socio.bono_cobrado || 0);
             const desgloseBonos = `<div style="background:rgba(66,133,133,0.08); border:1px solid rgba(66,133,133,0.3); border-radius:12px; padding:15px; margin:15px 0"><h4 style="color:var(--teal); margin:0 0 10px 0">Detalle de bonos cobrados</h4><table style="width:100%"><tr><td><strong>Bono 1 (15% directo)</strong></td><td style="color:var(--cream); font-size:18px; text-align:right">$${b1.toLocaleString()}</td></tr><tr><td><strong>Bono 2 (Escalonamiento)</strong></td><td style="color:var(--cream); font-size:18px; text-align:right">$${b2.toLocaleString()}</td></tr><tr><td><strong>Total bonos</strong></td><td style="color:var(--teal); font-size:20px; text-align:right">$${bonoTotal.toLocaleString()}</td></tr></table></div>`;
+            const cronoBox = `<div style="background:rgba(66,133,133,0.15); border:1px solid var(--teal); border-radius:12px; padding:15px; margin:15px 0; text-align:center"><h4 style="color:var(--teal); margin:0 0 8px 0">Ciclo Bono 2 (30 días)</h4><p style="font-size:12px; color:#aaa; margin:0 0 5px 0">PV del ciclo actual: <strong style="color:var(--cream)">${ptsCiclo.toLocaleString()}</strong> / ${meta.toLocaleString()}</p><p style="font-size:12px; color:var(--teal); margin:0">Próximo reinicio en: <span id="countdown30" style="font-size:18px; color:var(--cream); font-weight:bold">--</span></p></div>`;
             const btnLogout = `<a href="/logout" class="vmax-btn" style="background:#555; color:var(--cream); text-decoration:none; display:block; text-align:center; margin-top:10px">Cerrar sesión</a>`;
             const linkAjustes = `<a href="/ajustes" class="vmax-btn" style="background:#333; color:var(--cream); text-decoration:none; display:block; text-align:center; margin-top:8px">Ajustes de cuenta</a>`;
             const historialRetiros = `<div class="card"><h4>Historial de retiros</h4><table><tr><th>Fecha solicitud</th><th>Monto</th><th>Estado</th><th>Fecha liberado</th></tr>${(retiros||[]).map(r=>`<tr><td>${new Date(r.fecha_solicitud).toLocaleDateString('es-MX')}</td><td>$${r.monto.toLocaleString()}</td><td><span class="badge ${r.estado==='liberado'?'badge-active':'badge-pending'}">${r.estado}</span></td><td>${r.fecha_liberado?new Date(r.fecha_liberado).toLocaleDateString('es-MX'):'-'}</td></tr>`).join('')}</table>${(retiros||[]).length===0?'<p style="color:#888; font-size:12px">Sin retiros registrados.</p>':''}<a href="/estado_cuenta" target="_blank" class="vmax-btn" style="background:var(--gold); color:#000; text-decoration:none; display:block; text-align:center; margin-top:15px">Imprimir estado de cuenta</a></div>`;
-            res.send(`<html>${cssOrigen}${copyScript}<body><div class="card"><h3>Bienvenido, ${s.nombre}</h3><div class="stat-grid" style="grid-template-columns: repeat(3, 1fr)"><div class="stat-box"><span class="val">${s.puntos.toLocaleString()}</span><span class="label">PV Acumulados</span></div><div class="stat-box"><span class="val">$${s.balance.toLocaleString()}</span><span class="label">Balance MXN</span></div><div class="stat-box"><span class="val">$${bonoTotal.toLocaleString()}</span><span class="label">Bonos cobrados (total)</span></div></div>${desgloseBonos}<div class="bar-bg"><div class="bar-fill" style="width:${porc}%"></div></div><p style="text-align:center; font-size:11px; color:var(--teal)">Progreso hacia bono: ${meta.toLocaleString()} PV</p>${btnSolicitar}${linkAjustes}${btnLogout}</div>${historialRetiros}<div class="card"><h4>Mi Link de Referido:</h4><div class="link-cell"><input class="vmax-input" value="${linkRef}" readonly style="flex:1; margin-right:8px"><button id="btnCopy" class="copy-btn" onclick="copiarLink()">Copiar link</button></div><h4>Estructura Directa</h4><table><tr><th>Socio</th><th>Plan</th><th>Estado</th></tr>${(red||[]).map(i=>`<tr><td>${i.nombre}</td><td>${i.plan}</td><td><span class="badge ${i.estado==='activo'?'badge-active':'badge-pending'}">${i.estado}</span></td></tr>`).join('')}</table></div>${s.usuario==='ADMINRZ'?'<a href="/admin" class="vmax-btn" style="background:var(--gold); color:#000; text-decoration:none; display:block; text-align:center">Panel Administrativo</a>':''}</body></html>`);
+            res.send(`<html>${cssOrigen}${copyScript}${countdownScript}<body><div class="card"><h3>Bienvenido, ${socio.nombre}</h3><div class="stat-grid" style="grid-template-columns: repeat(3, 1fr)"><div class="stat-box"><span class="val">${socio.puntos.toLocaleString()}</span><span class="label">PV totales</span></div><div class="stat-box"><span class="val">${ptsCiclo.toLocaleString()}</span><span class="label">PV ciclo (Bono 2)</span></div><div class="stat-box"><span class="val">$${socio.balance.toLocaleString()}</span><span class="label">Balance MXN</span></div></div>${cronoBox}${desgloseBonos}<div class="bar-bg"><div class="bar-fill" style="width:${porc}%"></div></div><p style="text-align:center; font-size:11px; color:var(--teal)">Progreso Bono 2: ${ptsCiclo.toLocaleString()} / ${meta.toLocaleString()} PV</p>${btnSolicitar}${linkAjustes}${btnLogout}</div>${historialRetiros}<div class="card"><h4>Mi Link de Referido:</h4><div class="link-cell"><input class="vmax-input" value="${linkRef}" readonly style="flex:1; margin-right:8px"><button id="btnCopy" class="copy-btn" onclick="copiarLink()">Copiar link</button></div><h4>Estructura Directa</h4><table><tr><th>Socio</th><th>Plan</th><th>Estado</th></tr>${(red||[]).map(i=>`<tr><td>${i.nombre}</td><td>${i.plan}</td><td><span class="badge ${i.estado==='activo'?'badge-active':'badge-pending'}">${i.estado}</span></td></tr>`).join('')}</table></div>${socio.usuario==='ADMINRZ'?'<a href="/admin" class="vmax-btn" style="background:var(--gold); color:#000; text-decoration:none; display:block; text-align:center">Panel Administrativo</a>':''}</body></html>`);
+        };
+        const fetchAndRender = (socio) => {
+            db.all("SELECT * FROM socios WHERE patrocinador_id = ?", [socio.usuario], (err, red) => {
+                db.all("SELECT * FROM historial_retiros WHERE socio_id = ? ORDER BY fecha_solicitud DESC", [req.session.socioID], (err, retiros) => {
+                    doRender(socio, red || [], retiros || []);
+                });
             });
+        };
+        if (cicloNow > cicloStored) {
+            db.run("UPDATE socios SET puntos_ciclo = 0, ciclo_actual = ?, bono2_cobrado = 0 WHERE id = ?", [cicloNow, req.session.socioID], () => {
+                s.puntos_ciclo = 0; s.bono2_cobrado = 0; s.ciclo_actual = cicloNow;
+                fetchAndRender(s);
+            });
+        } else fetchAndRender(s);
+    });
+});
+
+app.get('/reiniciar_puntos', (req, res) => {
+    if (!req.session.socioID) return res.redirect('/');
+    db.get("SELECT usuario FROM socios WHERE id = ?", [req.session.socioID], (er, u) => {
+        if (!u || u.usuario !== 'ADMINRZ') return res.redirect('/dashboard');
+        db.run("UPDATE socios SET puntos = 0, volumen_red = 0, puntos_ciclo = 0, ciclo_actual = 0, bono_cobrado = 0, bono1_cobrado = 0, bono2_cobrado = 0", function(err) {
+            if (err) return res.redirect('/admin');
+            db.run("DELETE FROM activacion_detalle", () => res.redirect('/admin'));
         });
     });
 });
@@ -172,7 +217,7 @@ app.get('/admin', (req, res) => {
                 ? `<a href="/editar/${r.id}" style="color:#aaa">[EDITAR]</a> | <a href="/activar/${r.id}" style="color:var(--teal); font-weight:bold">[ACTIVAR]</a> | <a href="/liberar_pagos/${r.id}" style="color:var(--gold)">[LIBERAR PAGOS]</a>${linkEliminar}`
                 : `<a href="/editar/${r.id}" style="color:#aaa">[EDITAR]</a> | <a href="/desactivar/${r.id}" style="color:#e67e22; font-weight:bold">[DESACTIVAR]</a> | <a href="/liberar_pagos/${r.id}" style="color:var(--gold)">[LIBERAR PAGOS]</a>${linkEliminar}`;
             return `<tr><td><span class="badge ${r.estado==='activo'?'badge-active':'badge-pending'}">${r.estado}</span></td><td><small>${fechaReg}</small></td><td><b>${r.usuario}</b><br><small>${r.whatsapp||''}</small></td><td>${r.plan||''}<br><small style="color:var(--teal)">${r.hash_pago||'-'}</small></td><td><small>${r.direccion||''}</small></td><td>${solicitudCell}</td><td><div class="link-cell"><input type="text" value="${linkReg}" readonly style="width:140px"><button class="copy-btn" onclick="copiarLink(this,${JSON.stringify(linkReg)})">Copiar</button></div></td><td>${acciones}</td></tr>`;
-        }).join('')}</table><br><a href="/dashboard" style="color:var(--cream)">Volver al Dashboard</a> | <a href="/logout" style="color:#888">Cerrar sesión</a></div></body></html>`);
+        }).join('')}</table><br><a href="/reiniciar_puntos" style="color:#e74c3c; font-weight:bold" onclick="return confirm('¿Reiniciar TODOS los puntos a cero en todos los socios (incluyendo ADMINRZ)? Esta acción no se puede deshacer.')">[REINICIAR PUNTOS GLOBAL]</a> | <a href="/dashboard" style="color:var(--cream)">Volver al Dashboard</a> | <a href="/logout" style="color:#888">Cerrar sesión</a></div></body></html>`);
     });
 });
 
@@ -183,8 +228,8 @@ function revertirActivacion(socioId, cb) {
         let pending = rows.length;
         rows.forEach(r => {
             const pts = r.puntos_add || 0, b1 = r.bono1_add || 0, b2 = r.bono2_add || 0, tot = b1 + b2;
-            db.run("UPDATE socios SET puntos = CASE WHEN puntos - ? < 0 THEN 0 ELSE puntos - ? END, volumen_red = CASE WHEN volumen_red - ? < 0 THEN 0 ELSE volumen_red - ? END, balance = CASE WHEN balance - ? < 0 THEN 0 ELSE balance - ? END, bono_cobrado = CASE WHEN bono_cobrado - ? < 0 THEN 0 ELSE bono_cobrado - ? END, bono1_cobrado = CASE WHEN bono1_cobrado - ? < 0 THEN 0 ELSE bono1_cobrado - ? END, bono2_cobrado = CASE WHEN bono2_cobrado - ? < 0 THEN 0 ELSE bono2_cobrado - ? END WHERE usuario = ?",
-                [pts, pts, pts, pts, tot, tot, tot, tot, b1, b1, b2, b2, r.usuario_afectado], () => {
+            db.run("UPDATE socios SET puntos = CASE WHEN puntos - ? < 0 THEN 0 ELSE puntos - ? END, volumen_red = CASE WHEN volumen_red - ? < 0 THEN 0 ELSE volumen_red - ? END, puntos_ciclo = CASE WHEN COALESCE(puntos_ciclo,0) - ? < 0 THEN 0 ELSE COALESCE(puntos_ciclo,0) - ? END, balance = CASE WHEN balance - ? < 0 THEN 0 ELSE balance - ? END, bono_cobrado = CASE WHEN bono_cobrado - ? < 0 THEN 0 ELSE bono_cobrado - ? END, bono1_cobrado = CASE WHEN bono1_cobrado - ? < 0 THEN 0 ELSE bono1_cobrado - ? END, bono2_cobrado = CASE WHEN bono2_cobrado - ? < 0 THEN 0 ELSE bono2_cobrado - ? END WHERE usuario = ?",
+                [pts, pts, pts, pts, pts, pts, tot, tot, tot, tot, b1, b1, b2, b2, r.usuario_afectado], () => {
                 if (--pending === 0) db.run("DELETE FROM activacion_detalle WHERE socio_activado_id = ?", [socioId], () => cb());
             });
         });
@@ -192,23 +237,6 @@ function revertirActivacion(socioId, cb) {
 }
 
 // Obtener cadena de uplines (patrocinador y toda la línea ascendente)
-function revertirActivacion(db, socioId, cb) {
-    db.all("SELECT * FROM activacion_detalle WHERE socio_activado_id = ?", [socioId], (err, rows) => {
-        if (!rows || rows.length === 0) return cb();
-        let pending = rows.length;
-        const totalBono = (r) => (r.bono1_add || 0) + (r.bono2_add || 0);
-        rows.forEach(r => {
-            const pts = r.puntos_add || 0, b1 = r.bono1_add || 0, b2 = r.bono2_add || 0, tot = b1 + b2;
-            db.run("UPDATE socios SET puntos = CASE WHEN puntos - ? < 0 THEN 0 ELSE puntos - ? END, volumen_red = CASE WHEN volumen_red - ? < 0 THEN 0 ELSE volumen_red - ? END, balance = CASE WHEN balance - ? < 0 THEN 0 ELSE balance - ? END, bono_cobrado = CASE WHEN bono_cobrado - ? < 0 THEN 0 ELSE bono_cobrado - ? END, bono1_cobrado = CASE WHEN bono1_cobrado - ? < 0 THEN 0 ELSE bono1_cobrado - ? END, bono2_cobrado = CASE WHEN bono2_cobrado - ? < 0 THEN 0 ELSE bono2_cobrado - ? END WHERE usuario = ?",
-                [pts, pts, pts, pts, tot, tot, tot, tot, b1, b1, b2, b2, r.usuario_afectado], () => {
-                if (--pending === 0) {
-                    db.run("DELETE FROM activacion_detalle WHERE socio_activado_id = ?", [socioId], () => cb());
-                }
-            });
-        });
-    });
-}
-
 function getUplineChain(patrocinadorId, cb) {
     const chain = [];
     const next = (pid) => {
@@ -233,11 +261,12 @@ app.get('/activar/:id', (req, res) => {
                     if (idx >= uplines.length) return db.run("UPDATE socios SET estado = 'activo' WHERE id = ?", [req.params.id], () => res.redirect('/admin'));
                     const usuario = uplines[idx];
                     const esDirecto = idx === 0;
-                    db.run("UPDATE socios SET puntos = puntos + ?, volumen_red = volumen_red + ? WHERE usuario = ?", [valPlan, valPlan, usuario], () => {
-                        db.get("SELECT puntos, bono_cobrado, bono1_cobrado, bono2_cobrado FROM socios WHERE usuario = ?", [usuario], (er, p) => {
+                    db.run("UPDATE socios SET puntos = puntos + ?, volumen_red = volumen_red + ?, puntos_ciclo = COALESCE(puntos_ciclo,0) + ? WHERE usuario = ?", [valPlan, valPlan, valPlan, usuario], () => {
+                        db.get("SELECT puntos_ciclo, bono_cobrado, bono1_cobrado, bono2_cobrado FROM socios WHERE usuario = ?", [usuario], (er, p) => {
                             const bono1Add = esDirecto ? valPlan * 0.15 : 0;
-                            const totalBono = p.puntos >= 60000 ? 12000 : (p.puntos >= 30000 ? 6000 : (p.puntos >= 15000 ? 1500 : 0));
-                            const bono2Add = Math.max(0, totalBono - (p.bono_cobrado || 0));
+                            const ptsCiclo = p.puntos_ciclo || 0;
+                            const totalBono = ptsCiclo >= 60000 ? 12000 : (ptsCiclo >= 30000 ? 6000 : (ptsCiclo >= 15000 ? 1500 : 0));
+                            const bono2Add = Math.max(0, totalBono - (p.bono2_cobrado || 0));
                             const totalAdd = bono1Add + bono2Add;
                             if (totalAdd > 0) db.run("UPDATE socios SET balance = balance + ?, bono_cobrado = bono_cobrado + ?, bono1_cobrado = bono1_cobrado + ?, bono2_cobrado = bono2_cobrado + ? WHERE usuario = ?", [totalAdd, totalAdd, bono1Add, bono2Add, usuario]);
                             db.run("INSERT INTO activacion_detalle (socio_activado_id, usuario_afectado, puntos_add, bono1_add, bono2_add) VALUES (?,?,?,?,?)", [s.id, usuario, valPlan, bono1Add, bono2Add], () => procesar(idx + 1));
