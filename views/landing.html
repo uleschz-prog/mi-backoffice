@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Raízoma — Libertad Financiera con Origen</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #ffffff;
+      --text: #1a1a1a;
+      --text-muted: #6b7280;
+      --accent: #0066ff;
+      --accent-hover: #0052cc;
+      --gold: #d4af37;
+      --border: #e5e7eb;
+      --section-bg: #f9fafb;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; color: var(--text); line-height: 1.6; background: var(--bg); }
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+    section { padding: 100px 0; }
+    h1 { font-size: clamp(2.5rem, 5vw, 3.75rem); font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
+    h2 { font-size: clamp(1.75rem, 3vw, 2.25rem); font-weight: 600; letter-spacing: -0.02em; margin-bottom: 16px; }
+    p { color: var(--text-muted); font-size: 1.125rem; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; padding: 14px 28px; font-size: 1rem; font-weight: 600; text-decoration: none; border-radius: 12px; transition: all 0.2s; cursor: pointer; border: none; font-family: inherit; }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+    .btn-secondary { background: transparent; color: var(--text); border: 2px solid var(--border); }
+    .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-gold { background: var(--gold); color: #1a1a1a; }
+    .btn-gold:hover { background: #c9a227; transform: translateY(-1px); }
+
+    /* Nav */
+    nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(255,255,255,0.9); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+    nav .container { display: flex; align-items: center; justify-content: space-between; height: 72px; }
+    .logo { font-size: 1.5rem; font-weight: 700; color: var(--text); text-decoration: none; }
+    .nav-links { display: flex; align-items: center; gap: 24px; }
+    .nav-links a { color: var(--text-muted); text-decoration: none; font-weight: 500; font-size: 0.95rem; }
+    .nav-links a:hover { color: var(--accent); }
+    .nav-links .btn { padding: 10px 20px; font-size: 0.9rem; }
+
+    /* Hero */
+    .hero { padding: 160px 0 120px; text-align: center; }
+    .hero h1 { margin-bottom: 24px; }
+    .hero .subtitle { font-size: 1.25rem; max-width: 600px; margin: 0 auto 40px; }
+    .hero-btns { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+    .hero-btns .btn { min-width: 180px; }
+
+    /* Product */
+    .product { background: var(--section-bg); }
+    .product .section-intro { text-align: center; max-width: 600px; margin: 0 auto 64px; }
+    .product-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 32px; }
+    .product-card { background: white; padding: 40px 32px; border-radius: 16px; border: 1px solid var(--border); transition: box-shadow 0.2s; }
+    .product-card:hover { box-shadow: 0 12px 40px rgba(0,0,0,0.08); }
+    .product-icon { width: 48px; height: 48px; margin-bottom: 20px; color: var(--accent); }
+    .product-card h3 { font-size: 1.25rem; font-weight: 600; margin-bottom: 12px; }
+    .product-card p { font-size: 0.95rem; }
+
+    /* Plan */
+    .plan-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; margin-top: 48px; }
+    .plan-card { background: white; border: 1px solid var(--border); border-radius: 16px; padding: 32px; }
+    .plan-card.featured { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(0,102,255,0.1); }
+    .plan-card h4 { font-size: 1.125rem; margin-bottom: 12px; color: var(--text); }
+    .plan-card p { font-size: 0.9rem; }
+    .plan-num { font-size: 2rem; font-weight: 700; color: var(--accent); margin-bottom: 8px; }
+
+    /* Social Proof */
+    .social-proof { background: var(--section-bg); text-align: center; }
+    .stats { display: flex; justify-content: center; gap: 64px; flex-wrap: wrap; margin-top: 48px; }
+    .stat-item .num { font-size: 2.5rem; font-weight: 700; color: var(--accent); display: block; }
+    .stat-item .label { font-size: 0.9rem; color: var(--text-muted); margin-top: 4px; }
+    .testimonial { max-width: 640px; margin: 48px auto 0; padding: 32px; background: white; border-radius: 16px; border: 1px solid var(--border); font-style: italic; color: var(--text-muted); }
+    .testimonial-author { margin-top: 16px; font-style: normal; font-weight: 600; color: var(--text); }
+
+    /* FAQ */
+    .faq-list { max-width: 700px; margin: 48px auto 0; }
+    .faq-item { border-bottom: 1px solid var(--border); }
+    .faq-toggle { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 20px 0; background: none; border: none; font-size: 1rem; font-weight: 500; text-align: left; color: var(--text); cursor: pointer; font-family: inherit; }
+    .faq-toggle:hover { color: var(--accent); }
+    .faq-toggle::after { content: '+'; font-size: 1.25rem; color: var(--text-muted); transition: transform 0.2s; }
+    .faq-item.open .faq-toggle::after { transform: rotate(45deg); }
+    .faq-content { max-height: 0; overflow: hidden; transition: max-height 0.3s; }
+    .faq-content-inner { padding: 0 0 20px 0; color: var(--text-muted); font-size: 0.95rem; }
+
+    /* Footer */
+    footer { background: #0f172a; color: #94a3b8; padding: 64px 0 32px; }
+    .footer-grid { display: grid; grid-template-columns: 1fr auto auto; gap: 48px; align-items: start; margin-bottom: 48px; flex-wrap: wrap; }
+    .footer-brand { font-size: 1.25rem; font-weight: 700; color: white; }
+    .footer-links a { display: block; color: #94a3b8; text-decoration: none; margin-bottom: 8px; font-size: 0.9rem; }
+    .footer-links a:hover { color: white; }
+    .footer-bottom { border-top: 1px solid #334155; padding-top: 24px; font-size: 0.85rem; color: #64748b; }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="container">
+      <a href="#" class="logo">Raízoma</a>
+      <div class="nav-links">
+        <a href="#producto">Producto</a>
+        <a href="#plan">Plan</a>
+        <a href="#faq">FAQ</a>
+        <a href="#" id="navLoginBtn" class="btn btn-secondary">Iniciar Sesión</a>
+        <a href="#" id="navRegistroBtn" class="btn btn-primary">Únete ahora</a>
+      </div>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <div class="container">
+      <h1>Tu libertad financiera tiene un <span style="color: var(--accent)">origen</span></h1>
+      <p class="subtitle">Únete a una comunidad que transforma vidas a través del café y las cápsulas de origen. Construye tu red, genera ingresos y alcanza tus metas.</p>
+      <div class="hero-btns">
+        <a href="#" id="heroRegistroBtn" class="btn btn-gold">Únete ahora</a>
+        <a href="#" id="heroLoginBtn" class="btn btn-secondary">Iniciar Sesión</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="product" id="producto">
+    <div class="container">
+      <div class="section-intro">
+        <h2>Producto que inspira</h2>
+        <p>Calidad premium, beneficios reales y la oportunidad de crear tu propio negocio desde cero.</p>
+      </div>
+      <div class="product-grid">
+        <div class="product-card">
+          <svg class="product-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+          <h3>Café de origen</h3>
+          <p>Café premium de las mejores regiones. Sabor auténtico que tus clientes amarán.</p>
+        </div>
+        <div class="product-card">
+          <svg class="product-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+          <h3>Cápsulas exclusivas</h3>
+          <p>Conveniencia y sabor en cada taza. Ideal para el día a día.</p>
+        </div>
+        <div class="product-card">
+          <svg class="product-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+          <h3>Red de impacto</h3>
+          <p>Construye tu organización y genera ingresos recurrentes con cada venta.</p>
+        </div>
+        <div class="product-card">
+          <svg class="product-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <h3>Bonificaciones escalonadas</h3>
+          <p>Gana más al crecer: 15% directo, bonos por volumen y ciclos de 30 días.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="plan" id="plan">
+    <div class="container">
+      <div class="section-intro" style="text-align:center;max-width:600px;margin:0 auto 24px;">
+        <h2>Plan de compensación</h2>
+        <p>Gana de tres formas: por ventas directas, por el volumen de tu red y por alcanzar metas.</p>
+      </div>
+      <div class="plan-cards">
+        <div class="plan-card">
+          <div class="plan-num">1</div>
+          <h4>Bono directo (15%)</h4>
+          <p>Recibe el 15% de las ventas de tus referidos directos desde el primer día.</p>
+        </div>
+        <div class="plan-card featured">
+          <div class="plan-num">2</div>
+          <h4>Bono escalonado</h4>
+          <p>Alcanza 15K, 30K o 60K PV en tu ciclo de 30 días y obtén bonos de $1,500, $6,000 o $12,000 MXN.</p>
+        </div>
+        <div class="plan-card">
+          <div class="plan-num">3</div>
+          <h4>Red y ciclos</h4>
+          <p>Todo el volumen de tu organización cuenta. Cada 30 días se reinicia el ciclo para que sigas generando.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="social-proof">
+    <div class="container">
+      <h2>La comunidad que crece contigo</h2>
+      <p>Miles de socios ya están construyendo su futuro con Raízoma.</p>
+      <div class="stats">
+        <div class="stat-item">
+          <span class="num" id="statSocios">—</span>
+          <span class="label">Socios Activos</span>
+        </div>
+        <div class="stat-item">
+          <span class="num" id="statComisiones">—</span>
+          <span class="label">Comisiones Pagadas (MXN)</span>
+        </div>
+      </div>
+      <div class="testimonial">
+        <p>"Raízoma me abrió las puertas a un ingreso adicional real. El producto es excelente y el plan de compensación es claro y justo."</p>
+        <div class="testimonial-author">— Socio Raízoma</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="faq" id="faq">
+    <div class="container">
+      <h2 style="text-align:center;margin-bottom:16px;">Preguntas frecuentes</h2>
+      <p style="text-align:center;max-width:500px;margin:0 auto;">Resolvemos tus dudas más comunes.</p>
+      <div class="faq-list">
+        <div class="faq-item">
+          <button class="faq-toggle">¿Es legal el modelo de negocio?</button>
+          <div class="faq-content">
+            <div class="faq-content-inner">Raízoma opera bajo un modelo de venta directa (network marketing) legal en México. Vendemos productos tangibles (café y cápsulas) y las comisiones se basan en ventas reales. Cumplimos con la normativa aplicable en el país.</div>
+          </div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-toggle">¿Cómo empiezo?</button>
+          <div class="faq-content">
+            <div class="faq-content-inner">Haz clic en "Únete ahora", elige tu plan de inicio (Cápsulas, Café, Membresía Anual o Fundador), completa el formulario de registro y realiza tu pago. Un socio te guiará como patrocinador para activar tu cuenta.</div>
+          </div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-toggle">¿Cuánto puedo ganar?</button>
+          <div class="faq-content">
+            <div class="faq-content-inner">Depende de tu actividad. El 15% en ventas directas es inmediato. El bono escalonado (hasta $12,000 MXN por ciclo de 30 días) se obtiene al acumular volumen de ventas en tu red. No hay límite superior.</div>
+          </div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-toggle">¿Qué formas de pago aceptan?</button>
+          <div class="faq-content">
+            <div class="faq-content-inner">Aceptamos pagos en USDT (TRC20). El monto se calcula automáticamente al tipo de cambio de Binance al momento del registro o compra.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand">Raízoma</div>
+          <p style="margin-top:12px;font-size:0.9rem;">Libertad financiera con origen.</p>
+        </div>
+        <div class="footer-links">
+          <a href="/registro" id="footerRegistro">Registro</a>
+          <a href="/login" id="footerLogin">Iniciar sesión</a>
+          <a href="#producto">Producto</a>
+          <a href="#plan">Plan</a>
+        </div>
+        <div class="footer-links">
+          <a href="#" target="_blank" rel="noopener">Términos de uso</a>
+          <a href="#" target="_blank" rel="noopener">Aviso de privacidad</a>
+        </div>
+      </div>
+      <div class="footer-bottom">© 2025 Raízoma. Todos los derechos reservados.</div>
+    </div>
+  </footer>
+
+  <script>
+    (function() {
+      const REF_COOKIE = 'raizoma_ref';
+      const REF_DAYS = 7;
+      const BACKOFFICE_URL = (window.RAIZOMA_BACKOFFICE_URL || '__BACKOFFICE_URL__').replace(/\/$/, '');
+
+      function getRef() {
+        const params = new URLSearchParams(window.location.search);
+        const ref = params.get('ref');
+        if (ref) return ref;
+        const match = document.cookie.match(new RegExp('(^| )' + REF_COOKIE + '=([^;]+)'));
+        return match ? decodeURIComponent(match[2]) : null;
+      }
+
+      function setRefCookie(ref) {
+        const d = new Date();
+        d.setTime(d.getTime() + REF_DAYS * 24 * 60 * 60 * 1000);
+        document.cookie = REF_COOKIE + '=' + encodeURIComponent(ref) + ';expires=' + d.toUTCString() + ';path=/;SameSite=Lax';
+      }
+
+      function getRegistroUrl() {
+        const ref = getRef();
+        const base = '/registro';
+        return ref ? base + '?ref=' + encodeURIComponent(ref) : base;
+      }
+
+      function initRef() {
+        const params = new URLSearchParams(window.location.search);
+        const ref = params.get('ref');
+        if (ref) setRefCookie(ref);
+      }
+
+      function bindCta() {
+        const registroUrl = getRegistroUrl();
+        document.querySelectorAll('#heroRegistroBtn, #navRegistroBtn, #footerRegistro').forEach(el => {
+          if (el) { el.href = registroUrl; }
+        });
+        const loginUrl = BACKOFFICE_URL;
+        document.querySelectorAll('#heroLoginBtn, #navLoginBtn, #footerLogin').forEach(el => {
+          if (el) { el.href = loginUrl; }
+        });
+      }
+
+      function loadStats() {
+        fetch('/api/stats')
+          .then(r => r.json())
+          .then(d => {
+            const socios = document.getElementById('statSocios');
+            const comisiones = document.getElementById('statComisiones');
+            if (socios) socios.textContent = (d.sociosActivos || 0).toLocaleString();
+            if (comisiones) comisiones.textContent = '$' + (d.comisionesPagadas || 0).toLocaleString();
+          })
+          .catch(() => {});
+      }
+
+      function initFaq() {
+        document.querySelectorAll('.faq-item').forEach(item => {
+          const toggle = item.querySelector('.faq-toggle');
+          const content = item.querySelector('.faq-content');
+          if (!toggle || !content) return;
+          toggle.addEventListener('click', () => {
+            const isOpen = item.classList.contains('open');
+            document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
+            if (!isOpen) item.classList.add('open');
+          });
+        });
+      }
+
+      initRef();
+      bindCta();
+      loadStats();
+      initFaq();
+    })();
+  </script>
+</body>
+</html>

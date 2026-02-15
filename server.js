@@ -73,6 +73,16 @@ db.serialize(() => {
 app.use(bodyParser.urlencoded({ extended: true, limit: '15mb' }));
 app.use(bodyParser.json({ limit: '15mb' }));
 app.use(session({ secret: 'origen-vmax-secret-2026', resave: true, saveUninitialized: true }));
+app.use(express.static(path.join(__dirname, 'public')));
+
+// URL del backoffice (subdominio). Ej: https://app.raizoma.com o /login si mismo dominio
+const BACKOFFICE_URL = process.env.BACKOFFICE_URL || '/login';
+
+function getRefCookie(req) {
+    const c = req.headers.cookie || '';
+    const m = c.match(/raizoma_ref=([^;]+)/);
+    return m ? decodeURIComponent(m[1].trim()) : null;
+}
 
 // TEMÁTICA VISUAL BASADA EN EL PRODUCTO "RAÍZOMA ORIGEN"
 const cssOrigen = `<style>
@@ -106,18 +116,36 @@ const cssOrigen = `<style>
 
 // RUTAS LÓGICAS
 app.get('/', (req, res) => {
-    res.send(`<html>${cssOrigen}<body><div class="card"><h2>Raízoma</h2><form action="/login" method="POST"><input name="u" class="vmax-input" placeholder="Usuario" required><input name="p" type="password" class="vmax-input" placeholder="Contraseña" required><button class="vmax-btn">Entrar al Sistema</button></form><p style="text-align:center; font-size:13px">¿Nuevo socio? <a href="/registro" style="color:var(--teal)">Inscríbete aquí</a></p></div></body></html>`);
+    const landingPath = path.join(__dirname, 'views', 'landing.html');
+    fs.readFile(landingPath, 'utf8', (err, html) => {
+        if (err) return res.status(500).send('Error cargando página');
+        const backofficeUrl = BACKOFFICE_URL || '/login';
+        const injected = html.replace('__BACKOFFICE_URL__', backofficeUrl);
+        res.send(injected);
+    });
+});
+
+app.get('/login', (req, res) => {
+    res.send(`<html>${cssOrigen}<body><div class="card"><h2>Raízoma — Iniciar sesión</h2><form action="/login" method="POST"><input name="u" class="vmax-input" placeholder="Usuario" required><input name="p" type="password" class="vmax-input" placeholder="Contraseña" required><button class="vmax-btn">Entrar al Sistema</button></form><p style="text-align:center; font-size:13px; margin-top:15px">¿Nuevo socio? <a href="/registro" style="color:var(--teal)">Inscríbete aquí</a></p><p style="text-align:center; font-size:12px; margin-top:10px"><a href="/" style="color:#888">← Volver al inicio</a></p></div></body></html>`);
 });
 
 app.post('/login', (req, res) => {
     db.get("SELECT * FROM socios WHERE usuario = ? AND password = ?", [req.body.u, req.body.p], (err, row) => {
         if (row) { req.session.socioID = row.id; res.redirect('/dashboard'); }
-        else { res.send("<script>alert('Datos Incorrectos'); window.location='/';</script>"); }
+        else { res.send("<script>alert('Datos Incorrectos'); window.location='/login';</script>"); }
+    });
+});
+
+app.get('/api/stats', (req, res) => {
+    db.get("SELECT COUNT(*) as n FROM socios WHERE estado = 'activo' AND usuario != 'ADMINRZ'", (err, r1) => {
+        db.get("SELECT COALESCE(SUM(monto),0) as total FROM historial_retiros WHERE estado = 'liberado'", (err2, r2) => {
+            res.json({ sociosActivos: (r1 && r1.n) || 0, comisionesPagadas: (r2 && r2.total) || 0 });
+        });
     });
 });
 
 app.get('/registro', (req, res) => {
-    const ref = req.query.ref || '';
+    const ref = req.query.ref || getRefCookie(req) || '';
     const msgPatrocinador = ref ? `<p style="text-align:center; color:var(--teal); font-weight:bold; margin-bottom:15px">Patrocinador: <strong>${ref}</strong></p>` : '';
     const planes = [
         { v: 'Cápsulas $490', l: 'Cápsulas $490', mxn: 490 },
