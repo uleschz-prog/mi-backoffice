@@ -1,7 +1,7 @@
 /**
  * ============================================================================
  * SISTEMA RAÍZOMA V.MAX INFINITY - EDICIÓN "ORIGEN"
- * IDENTIDAD VISUAL: Teal (#428585), Negro Mate (#121212), Crema (#F5F5DC)
+ * IDENTIDAD VISUAL: Azul #0066ff, Dorado #d4af37, Inter, fondos claros (alineado con landing)
  * ============================================================================
  */
 const express = require('express');
@@ -84,34 +84,34 @@ function getRefCookie(req) {
     return m ? decodeURIComponent(m[1].trim()) : null;
 }
 
-// TEMÁTICA VISUAL BASADA EN EL PRODUCTO "RAÍZOMA ORIGEN"
-const cssOrigen = `<style>
-    :root { 
-        --teal: #428585; --dark: #121212; --card: #1e1e1e; 
-        --cream: #F5F5DC; --text: #e0e0e0; --gold: #d4af37;
-    }
-    body { background: var(--dark); color: var(--text); font-family: 'Inter', sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-    .card { background: var(--card); border: 1px solid rgba(66, 133, 133, 0.3); padding: 30px; border-radius: 20px; width: 100%; max-width: 650px; margin-bottom: 25px; box-shadow: 0 15px 35px rgba(0,0,0,0.5); }
-    h2, h3 { color: var(--teal); text-transform: uppercase; letter-spacing: 2px; text-align: center; }
+// TEMÁTICA ALINEADA CON LANDING: Inter, azul #0066ff, dorado #d4af37, fondos claros
+const cssOrigen = `<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+    :root { --bg: #ffffff; --text: #1a1a1a; --text-muted: #6b7280; --accent: #0066ff; --accent-hover: #0052cc; --gold: #d4af37; --border: #e5e7eb; --section-bg: #f9fafb; }
+    body { background: var(--section-bg); color: var(--text); font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; line-height: 1.6; }
+    .card { background: var(--bg); border: 1px solid var(--border); padding: 30px; border-radius: 16px; width: 100%; max-width: 650px; margin-bottom: 25px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+    h2, h3 { color: var(--text); font-weight: 600; letter-spacing: -0.02em; text-align: center; }
     .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0; }
-    .stat-box { background: rgba(66, 133, 133, 0.1); border: 1px solid var(--teal); padding: 20px; border-radius: 15px; text-align: center; }
-    .val { display: block; font-size: 28px; font-weight: bold; color: var(--cream); margin-bottom: 5px; }
-    .label { font-size: 11px; color: var(--teal); text-transform: uppercase; font-weight: bold; }
-    .bar-bg { background: #000; height: 14px; border-radius: 7px; margin: 15px 0; border: 1px solid rgba(245, 245, 220, 0.2); overflow: hidden; }
-    .bar-fill { background: linear-gradient(90deg, var(--teal), var(--cream)); height: 100%; border-radius: 7px; transition: 1.5s ease; }
-    .vmax-btn { background: var(--teal); color: var(--dark); border: none; padding: 16px; border-radius: 12px; width: 100%; font-weight: bold; cursor: pointer; text-transform: uppercase; transition: 0.3s; }
-    .vmax-btn:hover { background: var(--cream); transform: translateY(-2px); }
-    .vmax-input { width: 100%; padding: 15px; margin: 10px 0; border-radius: 10px; border: 1px solid #333; background: #000; color: #fff; box-sizing: border-box; font-size: 15px; }
+    .stat-box { background: var(--bg); border: 1px solid var(--border); padding: 20px; border-radius: 12px; text-align: center; }
+    .val { display: block; font-size: 28px; font-weight: 700; color: var(--accent); margin-bottom: 5px; }
+    .label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
+    .bar-bg { background: var(--border); height: 14px; border-radius: 7px; margin: 15px 0; overflow: hidden; }
+    .bar-fill { background: linear-gradient(90deg, var(--accent), var(--gold)); height: 100%; border-radius: 7px; transition: 1.5s ease; }
+    .vmax-btn { background: var(--accent); color: white; border: none; padding: 16px; border-radius: 12px; width: 100%; font-weight: 600; cursor: pointer; font-family: inherit; transition: 0.2s; }
+    .vmax-btn:hover { background: var(--accent-hover); transform: translateY(-1px); }
+    .vmax-input { width: 100%; padding: 15px; margin: 10px 0; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); box-sizing: border-box; font-size: 15px; font-family: inherit; }
     table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-    th { text-align: left; color: var(--teal); padding: 12px; font-size: 12px; border-bottom: 2px solid var(--teal); }
-    td { padding: 12px; border-bottom: 1px solid #333; font-size: 14px; }
-    .badge { padding: 4px 8px; border-radius: 5px; font-size: 10px; font-weight: bold; }
-    .badge-active { background: var(--teal); color: var(--dark); }
-    .badge-pending { background: #444; color: #aaa; }
-    .copy-btn { background: var(--teal); color: var(--dark); border: none; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: bold; margin-left: 5px; }
-    .copy-btn:hover { background: var(--cream); }
+    th { text-align: left; color: var(--accent); padding: 12px; font-size: 12px; font-weight: 600; border-bottom: 2px solid var(--border); }
+    td { padding: 12px; border-bottom: 1px solid var(--border); font-size: 14px; color: var(--text); }
+    .badge { padding: 4px 8px; border-radius: 6px; font-size: 10px; font-weight: 600; }
+    .badge-active { background: var(--accent); color: white; }
+    .badge-pending { background: var(--text-muted); color: white; }
+    .copy-btn { background: var(--accent); color: white; border: none; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 600; margin-left: 5px; font-family: inherit; }
+    .copy-btn:hover { background: var(--accent-hover); }
     .link-cell { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
-    .link-cell input { flex: 1; min-width: 120px; padding: 6px 10px; font-size: 11px; }
+    .link-cell input { flex: 1; min-width: 120px; padding: 6px 10px; font-size: 11px; background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+    a { color: var(--accent); }
+    a:hover { color: var(--accent-hover); }
 </style>`;
 
 // RUTAS LÓGICAS
@@ -126,7 +126,7 @@ app.get('/', (req, res) => {
 });
 
 app.get('/login', (req, res) => {
-    res.send(`<html>${cssOrigen}<body><div class="card"><h2>Raízoma — Iniciar sesión</h2><form action="/login" method="POST"><input name="u" class="vmax-input" placeholder="Usuario" required><input name="p" type="password" class="vmax-input" placeholder="Contraseña" required><button class="vmax-btn">Entrar al Sistema</button></form><p style="text-align:center; font-size:13px; margin-top:15px">¿Nuevo socio? <a href="/registro" style="color:var(--teal)">Inscríbete aquí</a></p><p style="text-align:center; font-size:12px; margin-top:10px"><a href="/" style="color:#888">← Volver al inicio</a></p></div></body></html>`);
+    res.send(`<html>${cssOrigen}<body><div class="card"><h2>Raízoma — Iniciar sesión</h2><form action="/login" method="POST"><input name="u" class="vmax-input" placeholder="Usuario" required><input name="p" type="password" class="vmax-input" placeholder="Contraseña" required><button class="vmax-btn">Entrar al Sistema</button></form><p style="text-align:center; font-size:13px; margin-top:15px">¿Nuevo socio? <a href="/registro" style="color:var(--accent)">Inscríbete aquí</a></p><p style="text-align:center; font-size:12px; margin-top:10px"><a href="/" style="color:var(--text-muted)">← Volver al inicio</a></p></div></body></html>`);
 });
 
 app.post('/login', (req, res) => {
@@ -146,7 +146,7 @@ app.get('/api/stats', (req, res) => {
 
 app.get('/registro', (req, res) => {
     const ref = req.query.ref || getRefCookie(req) || '';
-    const msgPatrocinador = ref ? `<p style="text-align:center; color:var(--teal); font-weight:bold; margin-bottom:15px">Patrocinador: <strong>${ref}</strong></p>` : '';
+    const msgPatrocinador = ref ? `<p style="text-align:center; color:var(--accent); font-weight:bold; margin-bottom:15px">Patrocinador: <strong>${ref}</strong></p>` : '';
     const planes = [
         { v: 'Cápsulas $490', l: 'Cápsulas $490', mxn: 490 },
         { v: 'Café Origen $790', l: 'Café Origen $790', mxn: 790 },
@@ -176,10 +176,10 @@ app.get('/registro', (req, res) => {
     function copiarWallet(){ navigator.clipboard.writeText(wallet); alert('Wallet copiada'); }
     </script>`;
     const boxPago = `
-    <div id="boxPago" style="background:rgba(66,133,133,0.15); border:1px solid var(--teal); border-radius:12px; padding:15px; margin:15px 0">
-    <h4 style="color:var(--teal); margin:0 0 10px 0">Pago en USDT (tipo de cambio Binance)</h4>
+    <div id="boxPago" style="background:rgba(0,102,255,0.06); border:1px solid var(--accent); border-radius:12px; padding:15px; margin:15px 0">
+    <h4 style="color:var(--accent); margin:0 0 10px 0">Pago en USDT (tipo de cambio Binance)</h4>
     <p style="margin:0 0 5px 0">Monto: <strong class="mxnVal">0</strong> MXN = <strong class="usdtVal">--</strong> USDT</p>
-    <p style="font-size:11px; color:var(--teal); margin:8px 0 5px 0">Wallet USDT (TRC20):</p>
+    <p style="font-size:11px; color:var(--accent); margin:8px 0 5px 0">Wallet USDT (TRC20):</p>
     <div class="link-cell"><input class="vmax-input" value="${WALLET_USDT}" readonly style="font-size:12px"><button type="button" class="copy-btn" onclick="copiarWallet()">Copiar</button></div>
     </div>`;
     res.send(`<html>${cssOrigen}${regScript}<body><div class="card"><h2>Registro Origen</h2>${msgPatrocinador}<form action="/reg" method="POST"><input type="hidden" name="ref" value="${ref}"><input name="n" class="vmax-input" placeholder="Nombre Completo" required><input name="w" class="vmax-input" placeholder="WhatsApp (52...)" required><input name="u" class="vmax-input" placeholder="Usuario" required><input name="p" type="password" class="vmax-input" placeholder="Contraseña" required><select name="pl" id="planSelect" class="vmax-input">${optsPlan}</select>${boxPago}<input name="h" class="vmax-input" placeholder="Hash de Pago / TxID" required><textarea name="d" class="vmax-input" placeholder="Dirección Completa de Envío" required style="height:80px"></textarea><button type="submit" class="vmax-btn">Enviar Inscripción</button></form></div></body></html>`);
@@ -238,13 +238,13 @@ app.get('/dashboard', (req, res) => {
             const b1 = socio.bono1_cobrado || 0;
             const b2 = socio.bono2_cobrado || 0;
             const bonoTotal = (socio.bono_cobrado || 0);
-            const desgloseBonos = `<div style="background:rgba(66,133,133,0.08); border:1px solid rgba(66,133,133,0.3); border-radius:12px; padding:15px; margin:15px 0"><h4 style="color:var(--teal); margin:0 0 10px 0">Detalle de bonos cobrados</h4><table style="width:100%"><tr><td><strong>Bono 1 (15% directo)</strong></td><td style="color:var(--cream); font-size:18px; text-align:right">$${b1.toLocaleString()}</td></tr><tr><td><strong>Bono 2 (Escalonamiento)</strong></td><td style="color:var(--cream); font-size:18px; text-align:right">$${b2.toLocaleString()}</td></tr><tr><td><strong>Total bonos</strong></td><td style="color:var(--teal); font-size:20px; text-align:right">$${bonoTotal.toLocaleString()}</td></tr></table></div>`;
-            const cronoBox = `<div style="background:rgba(66,133,133,0.15); border:1px solid var(--teal); border-radius:12px; padding:15px; margin:15px 0; text-align:center"><h4 style="color:var(--teal); margin:0 0 8px 0">Ciclo Bono 2 (30 días)</h4><p style="font-size:12px; color:#aaa; margin:0 0 5px 0">PV del ciclo actual: <strong style="color:var(--cream)">${ptsCiclo.toLocaleString()}</strong> / ${meta.toLocaleString()}</p><p style="font-size:12px; color:var(--teal); margin:0">Próximo reinicio en: <span id="countdown30" style="font-size:18px; color:var(--cream); font-weight:bold">--</span></p></div>`;
-            const btnLogout = `<a href="/logout" class="vmax-btn" style="background:#555; color:var(--cream); text-decoration:none; display:block; text-align:center; margin-top:10px">Cerrar sesión</a>`;
-            const linkAjustes = `<a href="/ajustes" class="vmax-btn" style="background:#333; color:var(--cream); text-decoration:none; display:block; text-align:center; margin-top:8px">Ajustes de cuenta</a>`;
+            const desgloseBonos = `<div style="background:var(--section-bg); border:1px solid var(--border); border-radius:12px; padding:15px; margin:15px 0"><h4 style="color:var(--accent); margin:0 0 10px 0">Detalle de bonos cobrados</h4><table style="width:100%"><tr><td><strong>Bono 1 (15% directo)</strong></td><td style="color:var(--text); font-size:18px; text-align:right">$${b1.toLocaleString()}</td></tr><tr><td><strong>Bono 2 (Escalonamiento)</strong></td><td style="color:var(--text); font-size:18px; text-align:right">$${b2.toLocaleString()}</td></tr><tr><td><strong>Total bonos</strong></td><td style="color:var(--accent); font-size:20px; text-align:right">$${bonoTotal.toLocaleString()}</td></tr></table></div>`;
+            const cronoBox = `<div style="background:rgba(0,102,255,0.06); border:1px solid var(--accent); border-radius:12px; padding:15px; margin:15px 0; text-align:center"><h4 style="color:var(--accent); margin:0 0 8px 0">Ciclo Bono 2 (30 días)</h4><p style="font-size:12px; color:var(--text-muted); margin:0 0 5px 0">PV del ciclo actual: <strong style="color:var(--text)">${ptsCiclo.toLocaleString()}</strong> / ${meta.toLocaleString()}</p><p style="font-size:12px; color:var(--accent); margin:0">Próximo reinicio en: <span id="countdown30" style="font-size:18px; color:var(--text); font-weight:bold">--</span></p></div>`;
+            const btnLogout = `<a href="/logout" class="vmax-btn" style="background:transparent; color:var(--text-muted); border:2px solid var(--border); text-decoration:none; display:block; text-align:center; margin-top:10px">Cerrar sesión</a>`;
+            const linkAjustes = `<a href="/ajustes" class="vmax-btn" style="background:var(--section-bg); color:var(--text); border:1px solid var(--border); text-decoration:none; display:block; text-align:center; margin-top:8px">Ajustes de cuenta</a>`;
             const linkCompras = `<a href="/compras" class="vmax-btn" style="background:var(--gold); color:#000; text-decoration:none; display:block; text-align:center; margin-top:8px">Comprar productos</a>`;
-            const historialRetiros = `<div class="card"><h4>Historial de retiros</h4><table><tr><th>Fecha solicitud</th><th>Monto</th><th>Estado</th><th>Fecha liberado</th></tr>${(retiros||[]).map(r=>`<tr><td>${new Date(r.fecha_solicitud).toLocaleDateString('es-MX')}</td><td>$${r.monto.toLocaleString()}</td><td><span class="badge ${r.estado==='liberado'?'badge-active':'badge-pending'}">${r.estado}</span></td><td>${r.fecha_liberado?new Date(r.fecha_liberado).toLocaleDateString('es-MX'):'-'}</td></tr>`).join('')}</table>${(retiros||[]).length===0?'<p style="color:#888; font-size:12px">Sin retiros registrados.</p>':''}<a href="/estado_cuenta" target="_blank" class="vmax-btn" style="background:var(--gold); color:#000; text-decoration:none; display:block; text-align:center; margin-top:15px">Imprimir estado de cuenta</a></div>`;
-            res.send(`<html>${cssOrigen}${copyScript}${countdownScript}<body><div class="card"><h3>Bienvenido, ${socio.nombre}</h3><div class="stat-grid" style="grid-template-columns: repeat(3, 1fr)"><div class="stat-box"><span class="val">${socio.puntos.toLocaleString()}</span><span class="label">PV totales</span></div><div class="stat-box"><span class="val">${ptsCiclo.toLocaleString()}</span><span class="label">PV ciclo (Bono 2)</span></div><div class="stat-box"><span class="val">$${socio.balance.toLocaleString()}</span><span class="label">Balance MXN</span></div></div>${cronoBox}${desgloseBonos}<div class="bar-bg"><div class="bar-fill" style="width:${porc}%"></div></div><p style="text-align:center; font-size:11px; color:var(--teal)">Progreso Bono 2: ${ptsCiclo.toLocaleString()} / ${meta.toLocaleString()} PV</p>${btnSolicitar}${linkCompras}${linkAjustes}${btnLogout}</div>${historialRetiros}<div class="card"><h4>Mi Link de Referido:</h4><div class="link-cell"><input class="vmax-input" value="${linkRef}" readonly style="flex:1; margin-right:8px"><button id="btnCopy" class="copy-btn" onclick="copiarLink()">Copiar link</button></div><h4>Estructura Directa</h4><table><tr><th>Socio</th><th>Plan</th><th>Estado</th></tr>${(red||[]).map(i=>`<tr><td>${i.nombre}</td><td>${i.plan}</td><td><span class="badge ${i.estado==='activo'?'badge-active':'badge-pending'}">${i.estado}</span></td></tr>`).join('')}</table></div>${socio.usuario==='ADMINRZ'?'<a href="/admin" class="vmax-btn" style="background:var(--gold); color:#000; text-decoration:none; display:block; text-align:center">Panel Administrativo</a>':''}</body></html>`);
+            const historialRetiros = `<div class="card"><h4>Historial de retiros</h4><table><tr><th>Fecha solicitud</th><th>Monto</th><th>Estado</th><th>Fecha liberado</th></tr>${(retiros||[]).map(r=>`<tr><td>${new Date(r.fecha_solicitud).toLocaleDateString('es-MX')}</td><td>$${r.monto.toLocaleString()}</td><td><span class="badge ${r.estado==='liberado'?'badge-active':'badge-pending'}">${r.estado}</span></td><td>${r.fecha_liberado?new Date(r.fecha_liberado).toLocaleDateString('es-MX'):'-'}</td></tr>`).join('')}</table>${(retiros||[]).length===0?'<p style="color:var(--text-muted); font-size:12px">Sin retiros registrados.</p>':''}<a href="/estado_cuenta" target="_blank" class="vmax-btn" style="background:var(--gold); color:#000; text-decoration:none; display:block; text-align:center; margin-top:15px">Imprimir estado de cuenta</a></div>`;
+            res.send(`<html>${cssOrigen}${copyScript}${countdownScript}<body><div class="card"><h3>Bienvenido, ${socio.nombre}</h3><div class="stat-grid" style="grid-template-columns: repeat(3, 1fr)"><div class="stat-box"><span class="val">${socio.puntos.toLocaleString()}</span><span class="label">PV totales</span></div><div class="stat-box"><span class="val">${ptsCiclo.toLocaleString()}</span><span class="label">PV ciclo (Bono 2)</span></div><div class="stat-box"><span class="val">$${socio.balance.toLocaleString()}</span><span class="label">Balance MXN</span></div></div>${cronoBox}${desgloseBonos}<div class="bar-bg"><div class="bar-fill" style="width:${porc}%"></div></div><p style="text-align:center; font-size:11px; color:var(--accent)">Progreso Bono 2: ${ptsCiclo.toLocaleString()} / ${meta.toLocaleString()} PV</p>${btnSolicitar}${linkCompras}${linkAjustes}${btnLogout}</div>${historialRetiros}<div class="card"><h4>Mi Link de Referido:</h4><div class="link-cell"><input class="vmax-input" value="${linkRef}" readonly style="flex:1; margin-right:8px"><button id="btnCopy" class="copy-btn" onclick="copiarLink()">Copiar link</button></div><h4>Estructura Directa</h4><table><tr><th>Socio</th><th>Plan</th><th>Estado</th></tr>${(red||[]).map(i=>`<tr><td>${i.nombre}</td><td>${i.plan}</td><td><span class="badge ${i.estado==='activo'?'badge-active':'badge-pending'}">${i.estado}</span></td></tr>`).join('')}</table></div>${socio.usuario==='ADMINRZ'?'<a href="/admin" class="vmax-btn" style="background:var(--gold); color:#000; text-decoration:none; display:block; text-align:center">Panel Administrativo</a>':''}</body></html>`);
         };
         const fetchAndRender = (socio) => {
             db.all("SELECT * FROM socios WHERE patrocinador_id = ?", [socio.usuario], (err, red) => {
@@ -279,23 +279,23 @@ app.get('/compras', (req, res) => {
         <h2>Comprar productos</h2>
         <p style="font-size:12px; color:#aaa; margin-bottom:15px">Tu plan actual: <strong>${plan || 'No definido'}</strong> ${esPremium ? '(precio preferencial)' : ''}</p>
         <div style="display:grid; gap:20px; margin:20px 0">
-        <div style="background:rgba(66,133,133,0.1); border:1px solid var(--teal); padding:20px; border-radius:15px">
-        <h4 style="color:var(--teal); margin:0 0 10px 0">Cápsulas</h4>
-        <p style="font-size:24px; color:var(--cream); margin:0 0 8px 0">$${precioCapsulas.toLocaleString()} MXN</p>
+        <div style="background:var(--section-bg); border:1px solid var(--border); padding:20px; border-radius:15px">
+        <h4 style="color:var(--accent); margin:0 0 10px 0">Cápsulas</h4>
+        <p style="font-size:24px; color:var(--text); margin:0 0 8px 0">$${precioCapsulas.toLocaleString()} MXN</p>
         <p style="font-size:14px; color:#aaa">En USDT: <strong id="usdtCaps">--</strong> USDT <small>(tipo de cambio en tiempo real)</small></p>
-        <p style="font-size:11px; color:var(--teal); margin-top:10px">Wallet USDT (TRC20):</p>
+        <p style="font-size:11px; color:var(--accent); margin-top:10px">Wallet USDT (TRC20):</p>
         <div class="link-cell" style="margin-top:5px"><input class="vmax-input" id="wallet" value="${WALLET_USDT}" readonly style="font-size:12px"><button class="copy-btn" onclick="copiarWallet()">Copiar</button></div>
         </div>
-        <div style="background:rgba(66,133,133,0.1); border:1px solid var(--teal); padding:20px; border-radius:15px">
-        <h4 style="color:var(--teal); margin:0 0 10px 0">Café Origen</h4>
-        <p style="font-size:24px; color:var(--cream); margin:0 0 8px 0">$${precioCafe.toLocaleString()} MXN</p>
+        <div style="background:var(--section-bg); border:1px solid var(--border); padding:20px; border-radius:15px">
+        <h4 style="color:var(--accent); margin:0 0 10px 0">Café Origen</h4>
+        <p style="font-size:24px; color:var(--text); margin:0 0 8px 0">$${precioCafe.toLocaleString()} MXN</p>
         <p style="font-size:14px; color:#aaa">En USDT: <strong id="usdtCafe">--</strong> USDT <small>(tipo de cambio en tiempo real)</small></p>
-        <p style="font-size:11px; color:var(--teal); margin-top:10px">Wallet USDT (TRC20):</p>
+        <p style="font-size:11px; color:var(--accent); margin-top:10px">Wallet USDT (TRC20):</p>
         <div class="link-cell" style="margin-top:5px"><input class="vmax-input" value="${WALLET_USDT}" readonly style="font-size:12px"><button class="copy-btn" onclick="copiarWallet()">Copiar</button></div>
         </div>
         </div>
         <p style="font-size:11px; color:#666">Realiza el pago en USDT (TRC20) a la wallet indicada. Incluye tu Hash/TxID en el mensaje de seguimiento.</p>
-        <a href="/dashboard" style="color:var(--cream); display:block; margin-top:15px; text-align:center">Volver al Dashboard</a>
+        <a href="/dashboard" style="color:var(--accent); display:block; margin-top:15px; text-align:center">Volver al Dashboard</a>
         </div>
         <script>
         fetch('/api/usdt-mxn').then(r=>r.json()).then(d=>{
@@ -345,19 +345,19 @@ app.get('/admin', (req, res) => {
             });
         }
         </script>`;
-        const seccionSolicitudes = solicitudes.length > 0 ? `<div class="card" style="max-width:1100px; margin-bottom:20px; border-color:var(--gold)"><h4 style="color:var(--gold)">Solicitudes de retiro pendientes</h4><table><tr><th>Socio</th><th>Monto solicitado</th><th>Acción</th></tr>${solicitudes.map(r=>`<tr><td><b>${r.usuario}</b><br><small>${r.nombre} - ${r.whatsapp||''}</small></td><td><strong style="color:var(--cream); font-size:18px">$${(r.monto_solicitado||r.balance||0).toLocaleString()}</strong></td><td><a href="/liberar_pagos/${r.id}" style="color:var(--teal); font-weight:bold">[LIBERAR PAGOS]</a></td></tr>`).join('')}</table></div>` : '';
+        const seccionSolicitudes = solicitudes.length > 0 ? `<div class="card" style="max-width:1100px; margin-bottom:20px; border-color:var(--gold)"><h4 style="color:var(--gold)">Solicitudes de retiro pendientes</h4><table><tr><th>Socio</th><th>Monto solicitado</th><th>Acción</th></tr>${solicitudes.map(r=>`<tr><td><b>${r.usuario}</b><br><small>${r.nombre} - ${r.whatsapp||''}</small></td><td><strong style="color:var(--text); font-size:18px">$${(r.monto_solicitado||r.balance||0).toLocaleString()}</strong></td><td><a href="/liberar_pagos/${r.id}" style="color:var(--accent); font-weight:bold">[LIBERAR PAGOS]</a></td></tr>`).join('')}</table></div>` : '';
         res.send(`<html>${cssOrigen}${copyScript}<body>${seccionSolicitudes}<div class="card" style="max-width:1100px"><h2>Control Maestro</h2><p style="font-size:12px; color:#aaa; margin-bottom:15px">Usuarios nuevos: validar pago (Plan/Hash) antes de activar.</p><table><tr><th>Estado</th><th>Fecha registro</th><th>Socio / WA</th><th>Plan / Hash</th><th>Dirección</th><th>Solicitud retiro</th><th>Link</th><th>Acción</th></tr>${(rows||[]).map(r=>{
             const linkReg = `https://${host}/registro?ref=${r.usuario}`;
             const solicitudCell = r.solicitud_retiro === 'pendiente' ? `<strong style="color:var(--gold)">$${(r.monto_solicitado||r.balance||0).toLocaleString()}</strong>` : r.solicitud_retiro === 'liberado' ? '<small>Liberado</small>' : '-';
             const fechaReg = r.fecha_reg ? new Date(r.fecha_reg).toLocaleDateString('es-MX', {year:'numeric',month:'2-digit',day:'2-digit'}) : '-';
             const linkEliminar = r.usuario !== 'ADMINRZ' ? ` | <a href="/eliminar/${r.id}" onclick="return confirm('¿Eliminar este usuario? Esta acción no se puede deshacer.')" style="color:#e74c3c; font-weight:bold">[ELIMINAR]</a>` : '';
             const acciones = r.estado === 'pendiente'
-                ? `<a href="/editar/${r.id}" style="color:#aaa">[EDITAR]</a> | <a href="/activar/${r.id}" style="color:var(--teal); font-weight:bold">[ACTIVAR]</a> | <a href="/liberar_pagos/${r.id}" style="color:var(--gold)">[LIBERAR PAGOS]</a>${linkEliminar}`
-                : `<a href="/editar/${r.id}" style="color:#aaa">[EDITAR]</a> | <a href="/desactivar/${r.id}" style="color:#e67e22; font-weight:bold">[DESACTIVAR]</a> | <a href="/liberar_pagos/${r.id}" style="color:var(--gold)">[LIBERAR PAGOS]</a>${linkEliminar}`;
-            return `<tr><td><span class="badge ${r.estado==='activo'?'badge-active':'badge-pending'}">${r.estado}</span></td><td><small>${fechaReg}</small></td><td><b>${r.usuario}</b><br><small>${r.whatsapp||''}</small></td><td>${r.plan||''}<br><small style="color:var(--teal)">${r.hash_pago||'-'}</small></td><td><small>${r.direccion||''}</small></td><td>${solicitudCell}</td><td><div class="link-cell"><input type="text" value="${linkReg}" readonly style="width:140px"><button class="copy-btn" onclick="copiarLink(this,${JSON.stringify(linkReg)})">Copiar</button></div></td><td>${acciones}</td></tr>`;
+                ? `<a href="/editar/${r.id}" style="color:var(--text-muted)">[EDITAR]</a> | <a href="/activar/${r.id}" style="color:var(--accent); font-weight:bold">[ACTIVAR]</a> | <a href="/liberar_pagos/${r.id}" style="color:var(--gold)">[LIBERAR PAGOS]</a>${linkEliminar}`
+                : `<a href="/editar/${r.id}" style="color:var(--text-muted)">[EDITAR]</a> | <a href="/desactivar/${r.id}" style="color:#e67e22; font-weight:bold">[DESACTIVAR]</a> | <a href="/liberar_pagos/${r.id}" style="color:var(--gold)">[LIBERAR PAGOS]</a>${linkEliminar}`;
+            return `<tr><td><span class="badge ${r.estado==='activo'?'badge-active':'badge-pending'}">${r.estado}</span></td><td><small>${fechaReg}</small></td><td><b>${r.usuario}</b><br><small>${r.whatsapp||''}</small></td><td>${r.plan||''}<br><small style="color:var(--text-muted)">${r.hash_pago||'-'}</small></td><td><small>${r.direccion||''}</small></td><td>${solicitudCell}</td><td><div class="link-cell"><input type="text" value="${linkReg}" readonly style="width:140px"><button class="copy-btn" onclick="copiarLink(this,${JSON.stringify(linkReg)})">Copiar</button></div></td><td>${acciones}</td></tr>`;
         }).join('')}</table><br>
         <p style="margin:15px 0"><a href="/reiniciar_puntos" style="color:#e74c3c; font-weight:bold" onclick="return confirm('¿Reiniciar TODOS los puntos a cero?')">[REINICIAR PUNTOS GLOBAL]</a> | <a href="/reiniciar_balance" style="color:#e67e22; font-weight:bold" onclick="return confirm('¿Reiniciar TODOS los balances a cero?')">[REINICIAR BALANCE GLOBAL]</a></p>
-        <div class="card" style="max-width:700px; margin-top:20px"><h3>Ventas globales de la organización</h3><canvas id="graficaVentas" width="600" height="280"></canvas><p style="text-align:center; font-size:18px; color:var(--cream); margin-top:15px">Total ventas: <strong id="totalVentas">$0</strong> MXN</p></div>
+        <div class="card" style="max-width:700px; margin-top:20px"><h3>Ventas globales de la organización</h3><canvas id="graficaVentas" width="600" height="280"></canvas><p style="text-align:center; font-size:18px; color:var(--accent); margin-top:15px">Total ventas: <strong id="totalVentas" style="color:var(--accent)">$0</strong> MXN</p></div>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <script>
         (function(){
@@ -366,10 +366,10 @@ app.get('/admin', (req, res) => {
             const ctx=document.getElementById('graficaVentas').getContext('2d');
             const labels=Object.keys(datos.porPlan).filter(k=>k!=='Otro'||Object.keys(datos.porPlan).length===1);
             const values=labels.map(l=>datos.porPlan[l]||0);
-            new Chart(ctx,{type:'bar',data:{labels:labels.length?labels:['Sin datos'],datasets:[{label:'Ventas MXN',data:values.length?values:[0],backgroundColor:['#428585','#d4af37','#F5F5DC','#2d6a6a']}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:'#aaa'}},x:{ticks:{color:'#aaa'}}}});
+            new Chart(ctx,{type:'bar',data:{labels:labels.length?labels:['Sin datos'],datasets:[{label:'Ventas MXN',data:values.length?values:[0],backgroundColor:['#0066ff','#d4af37','#6b7280','#0052cc']}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{color:'#6b7280'}},x:{ticks:{color:'#6b7280'}}}});
         })();
         </script>
-        <br><a href="/dashboard" style="color:var(--cream)">Volver al Dashboard</a> | <a href="/logout" style="color:#888">Cerrar sesión</a></div></body></html>`);
+        <br><a href="/dashboard" style="color:var(--accent)">Volver al Dashboard</a> | <a href="/logout" style="color:var(--text-muted)">Cerrar sesión</a></div></body></html>`);
     });
 });
 
@@ -471,7 +471,7 @@ app.get('/editar/:id', (req, res) => {
     db.get("SELECT * FROM socios WHERE id = ?", [req.params.id], (err, r) => {
         if (!r) return res.redirect('/admin');
         const optsPlan = opcionesPlan.map(p => `<option value="${p.v}" ${(r.plan||'').trim()===p.v?'selected':''}>${p.l}</option>`).join('');
-        res.send(`<html>${cssOrigen}<body><div class="card" style="max-width:500px"><h2>Editar socio</h2><form action="/editar/${r.id}" method="POST"><input name="nombre" class="vmax-input" placeholder="Nombre Completo" value="${(r.nombre||'').replace(/"/g,'&quot;')}" required><input name="usuario" class="vmax-input" placeholder="Usuario (ID)" value="${(r.usuario||'').replace(/"/g,'&quot;')}" required><input name="whatsapp" class="vmax-input" placeholder="WhatsApp (52...)" value="${(r.whatsapp||'').replace(/"/g,'&quot;')}"><select name="plan" class="vmax-input">${optsPlan}</select><textarea name="direccion" class="vmax-input" placeholder="Dirección" style="height:80px">${(r.direccion||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}</textarea><button type="submit" class="vmax-btn">Guardar cambios</button></form><a href="/admin" style="color:var(--cream); display:block; margin-top:15px; text-align:center">Cancelar</a></div></body></html>`);
+        res.send(`<html>${cssOrigen}<body><div class="card" style="max-width:500px"><h2>Editar socio</h2><form action="/editar/${r.id}" method="POST"><input name="nombre" class="vmax-input" placeholder="Nombre Completo" value="${(r.nombre||'').replace(/"/g,'&quot;')}" required><input name="usuario" class="vmax-input" placeholder="Usuario (ID)" value="${(r.usuario||'').replace(/"/g,'&quot;')}" required><input name="whatsapp" class="vmax-input" placeholder="WhatsApp (52...)" value="${(r.whatsapp||'').replace(/"/g,'&quot;')}"><select name="plan" class="vmax-input">${optsPlan}</select><textarea name="direccion" class="vmax-input" placeholder="Dirección" style="height:80px">${(r.direccion||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}</textarea><button type="submit" class="vmax-btn">Guardar cambios</button></form><a href="/admin" style="color:var(--accent); display:block; margin-top:15px; text-align:center">Cancelar</a></div></body></html>`);
     });
 });
 
@@ -505,7 +505,7 @@ app.get('/ajustes', (req, res) => {
     db.get("SELECT email, whatsapp, direccion FROM socios WHERE id = ?", [req.session.socioID], (err, s) => {
         if (!s) return res.redirect('/dashboard');
         const esc = (v) => (v||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-        res.send(`<html>${cssOrigen}<body><div class="card" style="max-width:500px"><h2>Ajustes de cuenta</h2><form action="/ajustes" method="POST"><label style="font-size:11px; color:var(--teal)">Correo electrónico</label><input type="email" name="email" class="vmax-input" placeholder="correo@ejemplo.com" value="${esc(s.email)}"><label style="font-size:11px; color:var(--teal)">Teléfono / WhatsApp</label><input type="text" name="whatsapp" class="vmax-input" placeholder="52... o 10 dígitos" value="${esc(s.whatsapp)}"><label style="font-size:11px; color:var(--teal)">Dirección de envío</label><textarea name="direccion" class="vmax-input" placeholder="Calle, colonia, ciudad, CP" style="height:80px">${esc(s.direccion)}</textarea><hr style="border-color:#333; margin:20px 0"><label style="font-size:11px; color:var(--teal)">Cambiar contraseña (dejar en blanco para no cambiar)</label><input type="password" name="pass_actual" class="vmax-input" placeholder="Contraseña actual"><input type="password" name="pass_nueva" class="vmax-input" placeholder="Nueva contraseña"><input type="password" name="pass_confirmar" class="vmax-input" placeholder="Confirmar nueva contraseña"><button type="submit" class="vmax-btn">Guardar cambios</button></form><a href="/dashboard" style="color:var(--cream); display:block; margin-top:15px; text-align:center">Volver al Dashboard</a></div></body></html>`);
+        res.send(`<html>${cssOrigen}<body><div class="card" style="max-width:500px"><h2>Ajustes de cuenta</h2><form action="/ajustes" method="POST"><label style="font-size:11px; color:var(--accent)">Correo electrónico</label><input type="email" name="email" class="vmax-input" placeholder="correo@ejemplo.com" value="${esc(s.email)}"><label style="font-size:11px; color:var(--accent)">Teléfono / WhatsApp</label><input type="text" name="whatsapp" class="vmax-input" placeholder="52... o 10 dígitos" value="${esc(s.whatsapp)}"><label style="font-size:11px; color:var(--accent)">Dirección de envío</label><textarea name="direccion" class="vmax-input" placeholder="Calle, colonia, ciudad, CP" style="height:80px">${esc(s.direccion)}</textarea><hr style="border-color:var(--border); margin:20px 0"><label style="font-size:11px; color:var(--accent)">Cambiar contraseña (dejar en blanco para no cambiar)</label><input type="password" name="pass_actual" class="vmax-input" placeholder="Contraseña actual"><input type="password" name="pass_nueva" class="vmax-input" placeholder="Nueva contraseña"><input type="password" name="pass_confirmar" class="vmax-input" placeholder="Confirmar nueva contraseña"><button type="submit" class="vmax-btn">Guardar cambios</button></form><a href="/dashboard" style="color:var(--accent); display:block; margin-top:15px; text-align:center">Volver al Dashboard</a></div></body></html>`);
     });
 });
 
@@ -531,17 +531,17 @@ app.get('/estado_cuenta', (req, res) => {
     db.get("SELECT * FROM socios WHERE id = ?", [req.session.socioID], (err, s) => {
         db.all("SELECT * FROM historial_retiros WHERE socio_id = ? ORDER BY fecha_solicitud DESC", [req.session.socioID], (err, retiros) => {
             const totalRetirado = (retiros||[]).filter(r=>r.estado==='liberado').reduce((a,r)=>a+r.monto,0);
-            const printCss = `<style>
+            const printCss = `<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"><style>
                 @media print{body{background:#fff;color:#000}button,.no-print{display:none !important}}
-                body{font-family:Arial,sans-serif;max-width:800px;margin:0 auto;padding:30px;color:#333}
-                h1{color:#428585;border-bottom:2px solid #428585;padding-bottom:10px}
-                .info{background:#f5f5f5;padding:15px;margin:20px 0;border-radius:8px}
+                body{font-family:'Inter',-apple-system,sans-serif;max-width:800px;margin:0 auto;padding:30px;color:#1a1a1a}
+                h1{color:#0066ff;border-bottom:2px solid #0066ff;padding-bottom:10px}
+                .info{background:#f9fafb;padding:15px;margin:20px 0;border-radius:8px}
                 table{width:100%;border-collapse:collapse;margin:20px 0}
-                th,td{border:1px solid #ddd;padding:12px;text-align:left}
-                th{background:#428585;color:#fff}
+                th,td{border:1px solid #e5e7eb;padding:12px;text-align:left}
+                th{background:#0066ff;color:#fff}
                 .total{font-weight:bold;font-size:18px;margin-top:20px}
-                button{background:#428585;color:#fff;border:none;padding:12px 24px;font-size:16px;cursor:pointer;border-radius:8px;margin:20px 0}
-                button:hover{background:#356}
+                button{background:#0066ff;color:#fff;border:none;padding:12px 24px;font-size:16px;cursor:pointer;border-radius:8px;margin:20px 0;font-family:inherit}
+                button:hover{background:#0052cc}
             </style>`;
             const rows = (retiros||[]).map(r=>`<tr><td>${new Date(r.fecha_solicitud).toLocaleString('es-MX')}</td><td>$${r.monto.toLocaleString()}</td><td>${r.estado}</td><td>${r.fecha_liberado?new Date(r.fecha_liberado).toLocaleString('es-MX'):'-'}</td></tr>`).join('');
             res.send(`<html><head><title>Estado de cuenta - ${s.nombre}</title>${printCss}</head><body><button onclick="window.print()" class="no-print">Imprimir / Guardar PDF</button><h1>Raízoma - Estado de cuenta</h1><div class="info"><strong> Socio:</strong> ${s.nombre}<br><strong>Usuario:</strong> ${s.usuario}<br><strong>Balance actual:</strong> $${(s.balance||0).toLocaleString()} MXN<br><strong>Fecha de emisión:</strong> ${new Date().toLocaleString('es-MX')}</div><h2>Historial de retiros</h2><table><tr><th>Fecha solicitud</th><th>Monto</th><th>Estado</th><th>Fecha liberado</th></tr>${rows}</table><p class="total">Total retirado (liberado): $${totalRetirado.toLocaleString()} MXN</p><p style="font-size:11px;color:#666;margin-top:40px">Documento generado automáticamente. raizoma.com</p></body></html>`);
